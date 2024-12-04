@@ -1,0 +1,152 @@
+#+title: Interpretable Cells Project
+#+bibliography: local-bib.bib
+#+cite_export: csl
+
+General resources and how-to's for logistics and our technologies.
+* Project
+** Overview
+We plan to use generative Deep Learning tools to
+** Plan
+*** <2024-07-11 Thu>
+**** Data acquisition
+- Selecting which data to acquire
+  - Working with all compounds is tricky as not all compounds has been tested in all sources which may induce bias:
+    - First idea would be to impose filters: at least 3 sources, 2 wells etc.. while removing the minimum amount of compounds.
+    - We could do the same, but instead of removing the minimum amount of compounds, keeping just compounds with a huge amount of samples
+      Obviously most of compounds has a low amount of samples so this conditions would greatly limit the amount of different compounds but might end up
+      in more samples for later cladssification.
+    - Last idea is to use the *Target2 Dataset*
+      - Either using the Target2 plate: each compounds always at the same well.
+      - Either using a enrich version, using compound from Target2 but not necessarily the Target2 plate only resulting in compounds having been tested sometimes
+        more than others but at least in different wells.
+  - Find which compounds/genes of JUMP have an associated MoA
+**** Select subset of JUMP data to use as a proxy
+- It might be recquired to crop the image around each nuclei.
+**** Pick, implement and train a generative architecture of a CNN
+- Input:
+  - Option A: A given compound
+  - Option B: A vector in the embedding space
+- Output:
+**** Select a classifier from other projects in the lab
+- X = compound (Adit's classifier)
+
+**** Benchmark
+There are multiple options.
+- MoAs
+- Knowledge graph (see with John)
+- Research other potential benchmarks
+
+*** <2024-08-01 Thu>
+**** Current state as of today:
+***** The data we are working with is Target2 Compounds.
+- This Dataset has been filtered so it is balanced per sources, and per microscope config.
+- All sources use the same number of compounds, not necessarily the same numbers of sample per compounds though.
+***** A classifier has been implemented to predict moa, the pipeline is as follow:
+***** Drop highly correlated features based on the training set, and then Random Forest (or XGBoost)
+***** Some fine tuning has been done (manually, and then with Ray tune but it is not working yet because GPU is not recognised.)
+***** Problem met:
+Classifier are biased toward moa with high sample.
+**** Feedback from the group meeting:
+***** This should not happen.
+- 3 ways to deal with it:
+  Either using SMOTE oversampling: problem since you are creating artificial replicates, is there so much biology behind that?
+  Either using a loss function harder: Focal Loss
+  Either removing moa with little amount of sample.
+***** How to be sure than the classifier is learning on moa and not on compounds?
+- A good way is to test on unseen compound by the training set: So we need more than 1 compound per moa, and so it is significant maybe 3!
+ Downsample this way might result in instead having a 10000 replicates dataset in something like just 1000 replicates or so. This is not a big deal
+ for the classifier purpose but maybe it is for the GANs. Something sure, data augmentation can be done with images (rotation croping etc...)
+***** Other feedback on the score used: I used ROC-AUC.
+Other good metric might be  F1-score / PR-AUC / ROC-AUC. I will go for F1 for multiple reason:
+If we want to compare how good the model is based on sources or well position for example: F1 Score is good for that as it is a simple mathematical relation
+and not necessarily an area under the curve.
+***** Something to keep in mind: Maybe moa is a good way to classify but do not forget TARGET!
+It happens that Target is smoother then moa in term of replicates per target. Now moa might be more biologically relevant than Target.
+Good distinction made by Srijit:
+- Target is more precise in a sense that for a drug, we know if it bound to this target, but we also if it doesn't for another target,
+  and if we just don't have the info.
+- Moa, this is different: a drug is classified with an moa, but we don't know if it could have been assigned to other moa as well.
+  Moa is very dependant on the annotation, we don't have the info if a drug could have had another moa or not etc..
+  Also moa database is maybe smaller than target: in brief, easy to identify a target, trickier to get the moa.
+**** The new plan:
+***** Creating 2 subsets on which working on:
+1. One subset with similar amount of replicates per target
+2. One subset with a similar amount of replicates per moa.
+In any case: At least 3 unique compound per class (for the grouping per compound). Something pretty much balanced on the amount of sample as well.
+Then discuss if we have a large enough Dataset.
+***** Redo the training using grouping on compound. Alternatively, a grouping can be done on sources, or even both!
+***** Get the result. (F1 score and ROC-AUC).
+Important: Try to identify if a source perform better, or eventually if some well perform better:
+HOWEVER: for sources, it should be feasible as all compounds has been tested in all sources.
+BUT, it is not necessarily the case for well, so if we obtain the result per well, it might actually be just be representative of the success of each moa itself.
+Maybe a good idea would be to identify 1 moa (with maybe multiple compound), that has been tested in two different well and see how things change.
+
+*** <2024-09-10 Tue>
+**** What has been done so far:
+***** Downsampling of profiles to balance each class of MoAs.
+Now we have 7 classes with 4 different compounds per moa. We do the training on 3 compounds per class and test on an unseen compound for each class.
+Result of xgboost, or deep learning methods hasn't been so great: in best case scenario, we manage to reach 48% accuracy on the test set on average on 5 fold.
+***** Classifier trained on images
+We use torch lightning to train images quicker with large flexibility (multi gpu and so on). manage to reach similar accuracy (roughly 45%) using a VGG like network. Problem faced, size of the model. Idea, Use ~Model Parallel~ which should be easy to implement using torch lightning. Few things to consider: no transformation at all on images has been done. Image has has just been resize by slicing them in 4. A good idea would be either to crop on cell kernel or krop around a dense amount of cells. Then apply rotation, translation and so on.
+Something to consider has well: only one channel has been tested. Now let's try with even more channels.
+***** Went back on the profiles and start implenmenting a GANs on the profiles:
+To visualise the counterfactuals, rows was just reshape once reshape to therefore plot a square of features. A Robust Scaler has been used to remove highly to allow a better visualisation. A classifier has been trained on the robust scaled data. A GANs has been implemented using the simple structure of Diane. Problem Diane structure use a lot of simplification: First there is no discriminator. Second there is no usage of a gaussian encoding vectors to allow a better low dimension embedding style space. The good news is that it is fairly simple. The GANs manage to produce good result on the training set: To have a metric on generative capacity of the model, first 7 style is sampled (1 image per class from the training set). Then 500 over the 585 are sampled from the training set. Finally 7 * 500 are generated and we try to assess the classification using the trained classifier (which has 84% accuracy on the trained set and \~50% on the test set) We manage to get 75% accuracy. In contrast the test set didn't perform so well with only 38% accuracy. Something to remember is the poor generalization capacity of our classifier (with only 54% accuracy, only 2 class are perfectly classified, 2 cannot be classified, and 3 others has 40-80% accuracy.) The poor capacity of the classifier may explain the discutable result obtained. ~Having a great classifier is fundamental for good assessment of the GANs performance~. ~A good idea would be to use a FID score as well and Iception score to have a metric independant of the classifier.~
+**** Plan as of today
+***** Having a great classifier is fundamental (at least having good performance on almost every class or at least balance performance on every class).
+Improving classifier performance:
+****** Remove vgg and use a resnet or a unet.
+****** Add transformation to reduce overfitting
+****** Use every channels (image with 5 channels instead of only 1)
+****** Finally unbias the training using Training ~Validation~ and Test set.
+To do so, the Validation set should be a split of the test set in half. Indeed the Validation set should not be too different from the test set. if we want to make an assumption on what should be the generalization on the test set. We could as well put again an unseen compound on the validation and the test set but we might not have enough compound (indeed we only have 4 compounds per class so if we want to put 2 compounds in the training, 1 in the validation and 1 in the test set, we really want to have a great confidence within the labelisation of our targets, which is actually not the case.)
+***** Train the simple GANs on images.
+***** If performance are not so great, go back on profiles, implement the more complex GAN using StarGan2. And try again on images.
+***** If performance are not so great, try using Diffusion model.
+***** If performance are not so great, the task might not be feasible with our current dataset: try using a different labelisation, different samples and so on.
+
+***
+
+
+*** <2024-11-25 Mon>
+**** What has been done so far:
+**** Current Problem:
+**** Next steps:
+***** Trying with no filtering on the 256 images.
+The goal is to see if the background has a specific signatures which actually help filtering things.
+***** Testing classification on compounds instead of on MoA.
+Here some MoA are poorly classified from fold to fold. The intuition is that it is because compounds are too different with their respective MoA so we need to see if it wouldn't be easier to classify on compounds rather on MoA. Maybe some compound are unclassifiable (we should remove them) or eventually too different of MoA. But maybe the MoA labellisation is just not meaningful and it is actually quiet easy to classify compounds with each others. Then we would be able to retrieve the minimum mask and tells the difference in those mask within a same mechanism of action.
+***** Do an interactive interface on the 448 classifiers to see the embedding retrieved by the the classifier on the 448 images.
+We could see how some image clusters and eventually investigates whether images with large amount of black pixels clusters together. This would help investigates this drop in accuracy when retrieving smaller tile. (256 or 128).
+***** Why not doing an auto-encoders on small tile of images (256 or 128) to get features that are relevant to each images.
+On a PCA plot we could investigate the clustering of images and see how too similar or different they are from image to image.
+***** Instead of working on the target2 subset, let's go with the big dataset. Then do mAP, and balancing algorithms.
+
+* Resources
+* Server (moby)
+Follow [[https://github.com/broadinstitute/monorepo/tree/2d3fc5a14e3eabe8a2bd7ce6b124a2c11825df5d/management/servers/onboarding.org][these]] instructions to set up access to the server.
+* Papers
+This may help you get more context
+** Morphological profiling
+- What is cell painting
+- The main dataset we will work on [cite:@chandrasekaranJUMPCellPainting2023].
+- Review on ML on morphological profiles [cite:@chandrasekaranImagebasedProfilingDrug2021a].
+** Statistics
+- How do we calculate reproducibility in Cell Painting experiments? [cite:@kalininVersatileInformationRetrieval2024]
+** Intepretable Deep Learning
+*** Counterfactuals
+- The basis of our plan. A new preprint will be released soon. [cite:@ecksteinDiscriminativeAttributionCounterfactuals2021]
+*** Generative modelling
+- Recent work in the interface of morphological profiling and Generative Deep Learning [cite:@lamiableRevealingInvisibleCell2023]
+
+** CycleGans and Generative Networks
+[cite:@zhuUnpairedImageToImageTranslation2017]
+
+* Learning tools
+- git basics: [[https://ohmygit.org/][oh my git]]
+* Selected important events
+- <2024-07-09 Tue> Alán's presentation with Janelia folks for a potential collaboration on Counterfactuals (See [[*Counterfactuals][Counterfactuals]]).
+- ~<2024-07-26 Fri> TBC: Mock Hackathon alongside CytoData to iron-out the issues and details necessary before the actual hackathon.
+- <2024-09-17 Tue> Hackathon organised by Alán, as part of SBI2-CytoData.
+
+* Bibliography
+#+print_bibliography:

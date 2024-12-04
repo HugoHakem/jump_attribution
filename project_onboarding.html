@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2024-06-06 Thu 18:45 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Project onboarding and resources</title>
+<meta name="author" content="Alán Muñoz" />
+<meta name="generator" content="Org Mode" />
+<style>
+  #content { max-width: 60em; margin: auto; }
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #e6e6e6;
+    border-radius: 3px;
+    background-color: #f2f2f2;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    padding: 3px;
+    color: #555;
+    background-color: #f2f2f299;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-authinfo::before { content: 'Authinfo'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { }
+</style>
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">Project onboarding and resources</h1>
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org4055bd9">1. Server (moby)</a>
+<ul>
+<li><a href="#org62712a7">1.1. Install and setup tailscale</a>
+<ul>
+<li><a href="#org60b1c29">1.1.1. Macos installation from download</a></li>
+<li><a href="#org0080953">1.1.2. Installed using brew/apt/&#x2026;</a></li>
+</ul>
+</li>
+<li><a href="#orgc52ef5c">1.2. Select packages</a></li>
+<li><a href="#org2068698">1.3. Add user to Nix Home manager</a></li>
+<li><a href="#orga3b346a">1.4. Day-to-day access</a>
+<ul>
+<li><a href="#orgafc5319">1.4.1. Jupyter notebook</a></li>
+<li><a href="#org279c77b">1.4.2. Step 1: Open Jupyter notebook on Moby</a></li>
+<li><a href="#org3ec054c">1.4.3. Step 2: Tunnel the port to your local computer</a></li>
+<li><a href="#org72725f1">1.4.4. VS Code</a></li>
+<li><a href="#org574ded5">1.4.5. Emacs</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org8db9bbc">2. Papers</a>
+<ul>
+<li><a href="#org1b1799e">2.1. Morphological profiling</a></li>
+<li><a href="#org29b67c9">2.2. Statistics</a></li>
+<li><a href="#orgcdfb053">2.3. Intepretable Deep Learning</a>
+<ul>
+<li><a href="#org74a9278">2.3.1. Counterfactuals</a></li>
+<li><a href="#orgdf0e347">2.3.2. Generative modelling</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#orgc21c7cd">3. Selected important events</a></li>
+<li><a href="#orgd35cd75">4. Bibliography</a></li>
+</ul>
+</div>
+</div>
+<p>
+General resources and how-to&rsquo;s for logistics and our technologies.
+</p>
+<div id="outline-container-org4055bd9" class="outline-2">
+<h2 id="org4055bd9"><span class="section-number-2">1.</span> Server (moby)</h2>
+<div class="outline-text-2" id="text-1">
+</div>
+<div id="outline-container-org62712a7" class="outline-3">
+<h3 id="org62712a7"><span class="section-number-3">1.1.</span> Install and setup tailscale</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+Download and install <a href="https://tailscale.com/">tailscale</a>. This will give you direct access to the server.
+</p>
+</div>
+<div id="outline-container-org60b1c29" class="outline-4">
+<h4 id="org60b1c29"><span class="section-number-4">1.1.1.</span> Macos installation from download</h4>
+<div class="outline-text-4" id="text-1-1-1">
+<div class="org-src-container">
+<pre class="src src-shell">/Applications/Tailscale.app/Contents/MacOS/Tailscale up --authkey tskey-abcdef1432341818
+</pre>
+</div>
+<p>
+You will receive a machine key that you can use to enter the network.
+</p>
+</div>
+</div>
+<div id="outline-container-org0080953" class="outline-4">
+<h4 id="org0080953"><span class="section-number-4">1.1.2.</span> Installed using brew/apt/&#x2026;</h4>
+<div class="outline-text-4" id="text-1-1-2">
+<div class="org-src-container">
+<pre class="src src-shell">tailscale up --authkey tskey-abcdef1432341818
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-orgc52ef5c" class="outline-3">
+<h3 id="orgc52ef5c"><span class="section-number-3">1.2.</span> Select packages</h3>
+<div class="outline-text-3" id="text-1-2">
+<ul class="org-ul">
+<li>Clone my <a href="https://github.com/afermg/clouds/">clouds</a> repository.</li>
+<li>Copy the <code>homes/llanos</code> folder as <code>homes/$USER</code>. It comes with basic tools.</li>
+<li>Add the packages you need in packages.nix, like <a href="https://github.com/afermg/clouds/blob/61c765a7e6ad36f62f3ae81e4009b26cf10a09c8/homes/llanos/packages.nix#L5-L10">this</a> example, which you can find in one of two ways:
+<ul class="org-ul">
+<li>The Nix Packages search tool <a href="https://search.nixos.org/packages">here</a></li>
+<li>If you already have a nix command line with <code>nix-search</code> installed you can run <code>nix-search -q &lt;package-name&gt;</code>.</li>
+<li>You can look at some of my packages <a href="https://github.com/afermg/clouds/blob/61c765a7e6ad36f62f3ae81e4009b26cf10a09c8/homes/amunoz/packages.nix#L3-L84">here</a>.</li>
+</ul></li>
+<li>Make sure to configure your git name and email in this step, just like <a href="https://github.com/afermg/clouds/blob/61c765a7e6ad36f62f3ae81e4009b26cf10a09c8/homes/llanos/packages.nix#L11-L15">this</a>.</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org2068698" class="outline-3">
+<h3 id="org2068698"><span class="section-number-3">1.3.</span> Add user to Nix Home manager</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+This section ensures that the home manager system finds your files and generates your user.
+</p>
+<ul class="org-ul">
+<li>There are a couple of places left to edit to get your own user.
+<ul class="org-ul">
+<li><code>machine/moby/default.nix</code></li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orga3b346a" class="outline-3">
+<h3 id="orga3b346a"><span class="section-number-3">1.4.</span> Day-to-day access</h3>
+<div class="outline-text-3" id="text-1-4">
+<p>
+You can access it in multiple ways.
+</p>
+</div>
+<div id="outline-container-orgafc5319" class="outline-4">
+<h4 id="orgafc5319"><span class="section-number-4">1.4.1.</span> Jupyter notebook</h4>
+<div class="outline-text-4" id="text-1-4-1">
+<p>
+This method requires <code>screen</code> both in remote and local computers.
+</p>
+</div>
+</div>
+<div id="outline-container-org279c77b" class="outline-4">
+<h4 id="org279c77b"><span class="section-number-4">1.4.2.</span> Step 1: Open Jupyter notebook on Moby</h4>
+<div class="outline-text-4" id="text-1-4-2">
+<div class="org-src-container">
+<pre class="src src-shell">ssh $<span style="color: #00d3d0;">USER</span>@moby
+screen
+<span style="color: #6ae4b9;">cd</span> project/folder
+<span style="color: #a8a8a8;"># </span><span style="color: #a8a8a8;">envrc should start by itself here. If this project has not been configured that way you can do:</span>
+<span style="color: #a8a8a8;"># </span><span style="color: #a8a8a8;">nix develop . --impure</span>
+poetry run jupyter notebook
+<span style="color: #a8a8a8;"># </span><span style="color: #a8a8a8;">Copy the url including the token</span>
+<span style="color: #a8a8a8;"># </span><span style="color: #a8a8a8;">Press &lt;Ctrl-A&gt; -&gt; &lt;Ctrl-D&gt; to detatch your screen session</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org3ec054c" class="outline-4">
+<h4 id="org3ec054c"><span class="section-number-4">1.4.3.</span> Step 2: Tunnel the port to your local computer</h4>
+<div class="outline-text-4" id="text-1-4-3">
+<p>
+Then open a tunnel to your jupyter notebook instance from the local computer.
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">screen -d -S tunnel -m <span style="color: #79a8ff;">'ssh -L 8888:localhost:8888 $USER@moby -N'</span>
+</pre>
+</div>
+
+<p>
+On your local computer, go yo the URL copied on step 1.
+</p>
+
+<p>
+If moby is restarted you must repeat step 1 (we can try to automate it too).
+If your local computer is restarted you need to repeat step 2.
+</p>
+</div>
+</div>
+<div id="outline-container-org72725f1" class="outline-4">
+<h4 id="org72725f1"><span class="section-number-4">1.4.4.</span> VS Code</h4>
+<div class="outline-text-4" id="text-1-4-4">
+<p>
+Tested on versions before 1.88.
+</p>
+
+<ol class="org-ol">
+<li>Install Remote Development Extension</li>
+<li></li>
+</ol>
+</div>
+</div>
+<div id="outline-container-org574ded5" class="outline-4">
+<h4 id="org574ded5"><span class="section-number-4">1.4.5.</span> Emacs</h4>
+<div class="outline-text-4" id="text-1-4-5">
+<p>
+I use emacs for most things, so it is already installed in moby.
+</p>
+<ol class="org-ol">
+<li>Set up your packages of interest (<a href="https://github.com/doomemacs/doomemacs">doom emacs</a> makes things easier). Make sure to include the direnv module.</li>
+</ol>
+<p>
+2.Run
+</p>
+<div class="org-src-container">
+<pre class="src src-shell">ssh $<span style="color: #00d3d0;">user</span>@moby -t <span style="color: #79a8ff;">'emacsclient -t'</span>
+
+</pre>
+</div>
+<ol class="org-ol">
+<li>You may need to fiddle a bit to get the proper environment working, this is work in progress.</li>
+</ol>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org8db9bbc" class="outline-2">
+<h2 id="org8db9bbc"><span class="section-number-2">2.</span> Papers</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+This may help you get more context
+</p>
+</div>
+<div id="outline-container-org1b1799e" class="outline-3">
+<h3 id="org1b1799e"><span class="section-number-3">2.1.</span> Morphological profiling</h3>
+<div class="outline-text-3" id="text-2-1">
+<ul class="org-ul">
+<li>What is cell painting</li>
+<li>The main dataset we will work on (<a href="#citeproc_bib_item_1">Chandrasekaran et al. 2023</a>).</li>
+<li>Review on ML on morphological profiles (<a href="#citeproc_bib_item_2">Chandrasekaran et al. 2021</a>).</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org29b67c9" class="outline-3">
+<h3 id="org29b67c9"><span class="section-number-3">2.2.</span> Statistics</h3>
+<div class="outline-text-3" id="text-2-2">
+<ul class="org-ul">
+<li>How do we calculate reproducibility in Cell Painting experiments? (<a href="#citeproc_bib_item_4">Kalinin et al. 2024</a>)</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgcdfb053" class="outline-3">
+<h3 id="orgcdfb053"><span class="section-number-3">2.3.</span> Intepretable Deep Learning</h3>
+<div class="outline-text-3" id="text-2-3">
+</div>
+<div id="outline-container-org74a9278" class="outline-4">
+<h4 id="org74a9278"><span class="section-number-4">2.3.1.</span> Counterfactuals</h4>
+<div class="outline-text-4" id="text-2-3-1">
+<ul class="org-ul">
+<li>The basis of our plan. A new preprint will be released soon. (<a href="#citeproc_bib_item_3">Eckstein et al. 2021</a>)</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgdf0e347" class="outline-4">
+<h4 id="orgdf0e347"><span class="section-number-4">2.3.2.</span> Generative modelling</h4>
+<div class="outline-text-4" id="text-2-3-2">
+<ul class="org-ul">
+<li>Recent work in the interface of morphological profiling and Generative Deep Learning (<a href="#citeproc_bib_item_5">Lamiable et al. 2023</a>)</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-orgc21c7cd" class="outline-2">
+<h2 id="orgc21c7cd"><span class="section-number-2">3.</span> Selected important events</h2>
+<div class="outline-text-2" id="text-3">
+<ul class="org-ul">
+<li><span class="timestamp-wrapper"><span class="timestamp">&lt;2024-07-02 Tue&gt; </span></span> Alán&rsquo;s presentation with Janelia folks for a potential collaboration on Counterfactuals (See <a href="#org74a9278">Counterfactuals</a>).</li>
+<li>~<span class="timestamp-wrapper"><span class="timestamp">&lt;2024-07-26 Fri&gt;  </span></span>  Mock Hackathon alongside CytoData to iron-out the issues and details necessary before the actual hackathon.</li>
+<li><span class="timestamp-wrapper"><span class="timestamp">&lt;2024-09-17 Tue&gt; </span></span> Hackathon organised by Alán, as part of SBI2-CytoData.</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgd35cd75" class="outline-2">
+<h2 id="orgd35cd75"><span class="section-number-2">4.</span> Bibliography</h2>
+<div class="outline-text-2" id="text-4">
+<style>.csl-entry{text-indent: -1.5em; margin-left: 1.5em;}</style><div class="csl-bib-body">
+  <div class="csl-entry"><a id="citeproc_bib_item_1"></a>Chandrasekaran, Srinivas Niranj, Jeanelle Ackerman, Eric Alix, D. Michael Ando, John Arevalo, Melissa Bennion, Nicolas Boisseau, et al. 2023. “JUMP Cell Painting Dataset: Morphological Impact of 136,000 Chemical and Genetic Perturbations.” bioRxiv. <a href="https://doi.org/10.1101/2023.03.23.534023">https://doi.org/10.1101/2023.03.23.534023</a>.</div>
+  <div class="csl-entry"><a id="citeproc_bib_item_2"></a>Chandrasekaran, Srinivas Niranj, Hugo Ceulemans, Justin D. Boyd, and Anne E. Carpenter. 2021. “Image-Based Profiling for Drug Discovery: Due for a Machine-Learning Upgrade?” <i>Nature Reviews Drug Discovery</i> 20 (2): 145–59. <a href="https://doi.org/10.1038/s41573-020-00117-w">https://doi.org/10.1038/s41573-020-00117-w</a>.</div>
+  <div class="csl-entry"><a id="citeproc_bib_item_3"></a>Eckstein, Nils, Alexander S. Bates, Gregory S. X. E. Jefferis, and Jan Funke. 2021. “Discriminative Attribution from Counterfactuals.” arXiv. <a href="https://doi.org/10.48550/arXiv.2109.13412">https://doi.org/10.48550/arXiv.2109.13412</a>.</div>
+  <div class="csl-entry"><a id="citeproc_bib_item_4"></a>Kalinin, Alexandr A., John Arevalo, Loan Vulliard, Erik Serrano, Hillary Tsang, Michael Bornholdt, Bartek Rajwa, Anne E. Carpenter, Gregory P. Way, and Shantanu Singh. 2024. “A Versatile Information Retrieval Framework for Evaluating Profile Strength and Similarity.” <i>Biorxiv</i>, April, 2024.04.01.587631. <a href="https://doi.org/10.1101/2024.04.01.587631">https://doi.org/10.1101/2024.04.01.587631</a>.</div>
+  <div class="csl-entry"><a id="citeproc_bib_item_5"></a>Lamiable, Alexis, Tiphaine Champetier, Francesco Leonardi, Ethan Cohen, Peter Sommer, David Hardy, Nicolas Argy, et al. 2023. “Revealing Invisible Cell Phenotypes with Conditional Generative Modeling.” <i>Nature Communications</i> 14 (1): 6386. <a href="https://doi.org/10.1038/s41467-023-42124-6">https://doi.org/10.1038/s41467-023-42124-6</a>.</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Alán Muñoz</p>
+<p class="date">Created: 2024-06-06 Thu 18:45</p>
+</div>
+</body>
+</html>
