@@ -129,9 +129,9 @@ def __(channel, chart, clip_outliers, load_image, mo, table):
         return fig
 
     selected_images = (
-        show_images(list(chart.value["site"]))
+        show_images(list(chart.value["img_id"]))
         if not len(table.value)
-        else show_images(list(table.value["site"]))
+        else show_images(list(table.value["img_id"]))
     )
 
     mo.md(
