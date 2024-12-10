@@ -614,5 +614,5 @@ root.create_dataset('groups', data=groups_filt, # dtype=object, object_codec=num
                     overwrite=True, chunks=1)
 #### Store metadata
 metadata_filt_df = pl.DataFrame(metadata_filt, schema=["Metadata_Source", "Metadata_Batch", "Metadata_Plate", "Metadata_Well", "site", "crop_id"])
-metadata_filt_df = metadata_filt_df.with_row_count("img_index")
+metadata_filt_df = metadata_filt_df.with_row_count("img_id")
 metadata_filt_df.write_csv(Path("image_active_crop_dataset/metadata.csv"))
