@@ -467,7 +467,7 @@ labels, groups = tuple((metadata
         .join(pl.DataFrame([t[:4] for t in iterable_stack],
                            schema=["Metadata_Source", "Metadata_Batch", "Metadata_Plate", "Metadata_Well"]),
               on=["Metadata_Source", "Metadata_Batch", "Metadata_Plate", "Metadata_Well"],
-              how="left")
+              how="right")
         .select(pl.col(["moa_id", "inchi_id"]))
         .to_dict(as_series=False)
         .values()))

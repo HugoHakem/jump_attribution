@@ -389,62 +389,90 @@ dataset_fold_ref = create_dataset_fold(custom_dataset.ImageDataset_Ref, imgs_pat
 # Classifier Training #####################################################################
 """
 
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-# os.environ["NCCL_P2P_DISABLE"] = "1"
-# # Lightning Training
-fold = 1
-tb_logger = pl_loggers.TensorBoardLogger(save_dir=Path("logs"), name="VGG_image_crop_active_groups")#"VGG_image_active")
-checkpoint_callback = ModelCheckpoint(dirpath=Path("lightning_checkpoint_log"),
-                                      filename=f"VGG_image_crop_active_groups_fold_{fold}"+"{epoch}-{train_acc:.2f}-{val_acc:.2f}", # f"VGG_image_active_fold_{fold}"+"{epoch}-{train_acc:.2f}-{val_acc:.2f}"
-                                      save_top_k=1,
-                                      monitor="val_acc",
-                                      mode="max",
-                                      every_n_epochs=1)
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+# # os.environ["NCCL_P2P_DISABLE"] = "1"
+# # # Lightning Training
+# fold = 1
+# tb_logger = pl_loggers.TensorBoardLogger(save_dir=Path("logs"), name="VGG_image_crop_active_groups")#"VGG_image_active")
+# checkpoint_callback = ModelCheckpoint(dirpath=Path("lightning_checkpoint_log"),
+#                                       filename=f"VGG_image_crop_active_groups_fold_{fold}"+"{epoch}-{train_acc:.2f}-{val_acc:.2f}", # f"VGG_image_active_fold_{fold}"+"{epoch}-{train_acc:.2f}-{val_acc:.2f}"
+#                                       save_top_k=1,
+#                                       monitor="val_acc",
+#                                       mode="max",
+#                                       every_n_epochs=1)
 
-torch.set_float32_matmul_precision('medium') #try 'high')
-seed_everything(42, workers=True)
+# torch.set_float32_matmul_precision('medium') #try 'high')
+# seed_everything(42, workers=True)
 
-lab_dim = 10
-max_epoch = 80
-lit_model = LightningModelV2(conv_model.VGG_ch,
-                             model_param=(len(channel), #img_depth
-                                          128, #448, #img_size
-                                          lab_dim, #4, #lab_dim
-                                          64, #16, #conv_n_ch 32
-                                          5,#7, #n_conv_block 6
-                                          [2, 2, 3, 3, 3], # [1, 1, 2, 2, 3, 3, 3], #n_conv_list
-                                          3,#3, #n_lin_block
-                                          0.2, #p_dropout
-                                          512),#None, #max_ch
-                             lr=1e-3, #5e-4
-                             weight_decay=0, #0
-                             max_epoch=max_epoch,
-                             n_class=lab_dim)
+# lab_dim = 10
+# max_epoch = 80
+# lit_model = LightningModelV2(conv_model.VGG_ch,
+#                              model_param=(len(channel), #img_depth
+#                                           128, #448, #img_size
+#                                           lab_dim, #4, #lab_dim
+#                                           64, #16, #conv_n_ch 32
+#                                           5,#7, #n_conv_block 6
+#                                           [2, 2, 3, 3, 3], # [1, 1, 2, 2, 3, 3, 3], #n_conv_list
+#                                           3,#3, #n_lin_block
+#                                           0.2, #p_dropout
+#                                           512),#None, #max_ch
+#                              lr=1e-3, #5e-4
+#                              weight_decay=0, #0
+#                              max_epoch=max_epoch,
+#                              n_class=lab_dim)
 
-trainer = L.Trainer(#default_root_dir="./lightning_checkpoint_log/",
-                    accelerator="gpu",
-                    devices=2,
-                    strategy="ddp_notebook", # ddp_notebook
-                    max_epochs=max_epoch,
-                    logger=tb_logger,
-                    #profiler="simple",
-                    num_sanity_val_steps=0, #to use only if you know the trainer is working !
-                    callbacks=[checkpoint_callback],
-                    #enable_checkpointing=False,
-                    enable_progress_bar=False
-                    #deterministic=True #using along with torchmetric: it slow down process as it apparently rely
-                    #on some cumsum which is not permitted in deterministic on GPU and then transfer to CPU
-                    )
+# trainer = L.Trainer(#default_root_dir="./lightning_checkpoint_log/",
+#                     accelerator="gpu",
+#                     devices=2,
+#                     strategy="ddp_notebook", # ddp_notebook
+#                     max_epochs=max_epoch,
+#                     logger=tb_logger,
+#                     #profiler="simple",
+#                     num_sanity_val_steps=0, #to use only if you know the trainer is working !
+#                     callbacks=[checkpoint_callback],
+#                     #enable_checkpointing=False,
+#                     enable_progress_bar=False
+#                     #deterministic=True #using along with torchmetric: it slow down process as it apparently rely
+#                     #on some cumsum which is not permitted in deterministic on GPU and then transfer to CPU
+#                     )
 
-soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
-batch_size = 256 #128
-trainer.fit(lit_model, DataLoader(dataset_fold[fold]["train"], batch_size=batch_size, num_workers=1, shuffle=True, persistent_workers=True),
-            DataLoader(dataset_fold[fold]["val"], batch_size=batch_size, num_workers=1, persistent_workers=True))
+# soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+# resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
+# batch_size = 256 #128
+# trainer.fit(lit_model, DataLoader(dataset_fold[fold]["train"], batch_size=batch_size, num_workers=1, shuffle=True, persistent_workers=True),
+#             DataLoader(dataset_fold[fold]["val"], batch_size=batch_size, num_workers=1, persistent_workers=True))
 
 """
 # Generate Embedding #####################################################################
 """
+
+# model=conv_model.VGG_ch
+# model_path="VGG_image_crop_active_groups_fold_1epoch=77-train_acc=0.86-val_acc=0.77.ckpt"
+# lightning_log_path=Path("lightning_checkpoint_log")
+# extract_emb_layer=slice_sequence_module
+# extract_emb_layer_param={"slice_id": -1}
+# lightning_module=LightningModelV2
+# trained_model = lightning_module.load_from_checkpoint(
+#     checkpoint_path=lightning_log_path / model_path,
+#     model=model).model
+
+# embedding_model, embedding_to_logits_model = tuple(map(lambda model: model.eval(), extract_emb_layer(trained_model,
+#                                                                                                          **extract_emb_layer_param)))
+
+# dataset_args={
+#     "imgs_path": imgs_path,
+#     "channel": id_channel,
+#     "fold_idx": None,
+#     "img_key": "imgs",
+#     "lbl_key": "groups"}
+# dataset = custom_dataset.ImageDataset(
+#     img_transform=v2.Compose([v2.Lambda(lambda img:
+#                                         torch.tensor(img, dtype=torch.float32)),
+#                               v2.Normalize(mean=len(channel)*[0.5],
+#                                            std=len(channel)*[0.5])]),
+#     label_transform=lambda label: torch.tensor(label, dtype=torch.long),
+#     **dataset_args)
+
 def slice_sequence_module(model, slice_id, **kwargs):
     return (
         nn.Sequential(*list(model.sequence.children())[:slice_id]),
@@ -493,7 +521,7 @@ def compute_embedding(
         pl.DataFrame(
             np.hstack([np.hstack(y_hat_stack)[:, None], np.vstack(embedding_stack)])
         )
-        .with_columns(pl.col("column_0").cast(pl.Int8))
+        .with_columns(pl.col("column_0").cast(int))
         .rename({"column_0": "pred"})
         )
     embedding_df.write_csv(imgs_folder / ("embedding_" + model_path[:-4] + "csv"))
