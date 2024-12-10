@@ -35,4 +35,4 @@ new_data = pl.concat(
     ),
     how="horizontal")
 # new_data = pl.concat((metadata, data.select(pl.col("^column_[123]$")).rename(lambda x: f"PC{x[-1]}")), how="horizontal")
-new_data.write_parquet(dir_path / "embedding_UMAP.parquet")
+new_data.write_parquet(dir_path / "embedding_UMAP2.parquet")

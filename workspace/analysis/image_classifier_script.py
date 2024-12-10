@@ -385,9 +385,9 @@ dataset_fold_ref = create_dataset_fold(custom_dataset.ImageDataset_Ref, imgs_pat
 # plt.close()
 
 
-'''
-classifier Training
-'''
+"""
+# Classifier Training #####################################################################
+"""
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 # os.environ["NCCL_P2P_DISABLE"] = "1"
@@ -476,8 +476,8 @@ def compute_embedding(
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     trained_model = lightning_module.load_from_checkpoint(
         checkpoint_path=lightning_log_path / model_path,
-        model=model).model.eval()
-    embedding_model, embedding_to_logits_model = tuple(map(lambda model: model.to(device), extract_emb_layer(trained_model,
+        model=model).model
+    embedding_model, embedding_to_logits_model = tuple(map(lambda model: model.to(device).eval(), extract_emb_layer(trained_model,
                                                                                                              **extract_emb_layer_param)))
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     embedding_stack, y_hat_stack = [], []
@@ -503,7 +503,7 @@ compute_embedding(
     model_path="VGG_image_crop_active_groups_fold_1epoch=77-train_acc=0.86-val_acc=0.77.ckpt",
     lightning_log_path=Path("lightning_checkpoint_log"),
     extract_emb_layer=slice_sequence_module,
-    extract_emb_layer_param={"slice_id": 6},
+    extract_emb_layer_param={"slice_id": -1},
     lightning_module=LightningModelV2,
     dataset_args={
         "imgs_path": imgs_path,
@@ -512,6 +512,7 @@ compute_embedding(
         "img_key": "imgs",
         "lbl_key": "groups"},
     batch_size=256)
+
 """
 # GANs Training #####################################################################
 """
