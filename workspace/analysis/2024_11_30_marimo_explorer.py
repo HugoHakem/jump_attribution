@@ -211,20 +211,36 @@ def __(
                                   .with_columns(
                                       (pl.col("pixel_count") / pl.col("pixel_count").sum().over(metadata_L + ["channel"])).alias("pixel_freq")
                                   ))
-        ax = (alt.Chart(pixel_count_df_grouped)
-              .mark_bar(
-                  opacity=0.3,
-                  binSpacing=0
-              ).encode(
-                  x=alt.X('bin_start:Q', bin='binned', title='Value Range'),
-                  x2='bin_end:Q',  # Use x2 for the bin range
-                  y=alt.Y('pixel_freq:Q', title='Frequency').stack(None),
-                  column=alt.Column('channel:N', title='Channel'),
-                  color=alt.Color(f"{metadata_L[0]}:N", title=f"{metadata_L[0]}"),
-              ).properties(
-                  title='Histogram'))
+
         if len(metadata_L) > 1:
-            ax.encode(row=alt.Row(f"{metadata_L[1]}:N", title=f"{metadata_L[1]}"))
+            ax = (alt.Chart(pixel_count_df_grouped)
+                  .mark_bar(
+                      opacity=0.3,
+                      binSpacing=0
+                  ).encode(
+                      x=alt.X('bin_start:Q', bin='binned', title='Value Range'),
+                      x2='bin_end:Q',  # Use x2 for the bin range
+                      y=alt.Y('pixel_freq:Q', title='Frequency').stack(None),
+                      column=alt.Column('channel:N', title='Channel'),
+                      row=alt.Row(f"{metadata_L[1]}:N", title=f"{metadata_L[1]}"),
+                      color=alt.Color(f"{metadata_L[0]}:N", title=f"{metadata_L[0]}"),
+                  ).properties(
+                      title='Histogram'))
+        else:
+            ax = (alt.Chart(pixel_count_df_grouped)
+                  .mark_bar(
+                      opacity=0.3,
+                      binSpacing=0
+                  ).encode(
+                      x=alt.X('bin_start:Q', bin='binned', title='Value Range'),
+                      x2='bin_end:Q',  # Use x2 for the bin range
+                      y=alt.Y('pixel_freq:Q', title='Frequency').stack(None),
+                      column=alt.Column('channel:N', title='Channel'),
+                      color=alt.Color(f"{metadata_L[0]}:N", title=f"{metadata_L[0]}"),
+                  ).properties(
+                      title='Histogram'))
+     
+
         return ax
     return compute_pixel_distribution, operator
 
