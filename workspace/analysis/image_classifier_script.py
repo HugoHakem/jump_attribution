@@ -194,19 +194,20 @@ imgs_folder = Path("image_active_crop_dataset") # Path("image_active_dataset")
 imgs_file = Path("imgs_labels_groups.zarr")
 imgs_path = imgs_folder / imgs_file
 image_dataset = zarr.open(imgs_path)
-kfold_train_test = list(StratifiedShuffleSplit(n_splits=5, train_size=0.65, random_state=42).split(
-    np.zeros(len(image_dataset["groups"])), y=image_dataset["groups"]))
-kfold_train_val_test = list(starmap(lambda train, val_test: [train,
-                                                             *list(starmap(lambda val, test: (val_test[val], val_test[test]),
-                                                                           StratifiedShuffleSplit(n_splits=1, random_state=42, test_size=0.5).split(
-                                                                               np.zeros(len(val_test)), image_dataset["groups"].oindex[val_test])))[0]],
-                                    kfold_train_test))
-# kfold_train_test = list(StratifiedGroupKFold_custom(random_state=42).split(None, image_dataset["labels"][:], image_dataset["groups"][:]))
+# kfold_train_test = list(StratifiedShuffleSplit(n_splits=5, train_size=0.65, random_state=42).split(
+#     np.zeros(len(image_dataset["groups"])), y=image_dataset["groups"]))
 # kfold_train_val_test = list(starmap(lambda train, val_test: [train,
 #                                                              *list(starmap(lambda val, test: (val_test[val], val_test[test]),
 #                                                                            StratifiedShuffleSplit(n_splits=1, random_state=42, test_size=0.5).split(
-#                                                                                np.zeros(len(val_test)), image_dataset["labels"].oindex[val_test])))[0]],
+#                                                                                np.zeros(len(val_test)), image_dataset["groups"].oindex[val_test])))[0]],
 #                                     kfold_train_test))
+
+kfold_train_test = list(StratifiedGroupKFold_custom(random_state=42).split(None, image_dataset["labels"][:], image_dataset["groups"][:]))
+kfold_train_val_test = list(starmap(lambda train, val_test: [train,
+                                                             *list(starmap(lambda val, test: (val_test[val], val_test[test]),
+                                                                           StratifiedShuffleSplit(n_splits=1, random_state=42, test_size=0.5).split(
+                                                                               np.zeros(len(val_test)), image_dataset["labels"].oindex[val_test])))[0]],
+                                    kfold_train_test))
 # ## #i) Transformation applied to train split
 img_transform_train = v2.RandomApply([v2.RandomVerticalFlip(p=0.5),
                                       v2.RandomChoice([v2.Lambda(lambda img: v2.functional.rotate(img, angle=0)),
@@ -214,9 +215,8 @@ img_transform_train = v2.RandomApply([v2.RandomVerticalFlip(p=0.5),
                                                        v2.Lambda(lambda img: v2.functional.rotate(img, angle=180)),
                                                        v2.Lambda(lambda img: v2.functional.rotate(img, angle=270))])],
                                      p=1)
-
 fold_L = np.arange(5)
-channel = ["AGP","DNA", "ER"]#, "Mito", "RNA"]
+channel = ["AGP","DNA", "ER", "Mito", "RNA"]
 channel.sort()
 map_channel = {ch: i for i, ch in enumerate(["AGP", "DNA", "ER", "Mito", "RNA"])}
 id_channel = np.array([map_channel[ch] for ch in channel])
@@ -272,9 +272,9 @@ def create_dataset_fold(dataset_func,
 
 
 dataset_fold = create_dataset_fold(custom_dataset.ImageDataset, imgs_path, id_channel, kfold_train_val_test,
-                                   img_transform_train, img_key="imgs", lbl_key="groups")
+                                   img_transform_train, img_key="imgs", lbl_key="labels")
 dataset_fold_ref = create_dataset_fold(custom_dataset.ImageDataset_Ref, imgs_path, id_channel, kfold_train_val_test,
-                                       img_transform_train, img_key="imgs", lbl_key="groups")
+                                       img_transform_train, img_key="imgs", lbl_key="labels")
 # ### I) Memory usage per fold
 
 # def fold_memory_usage(fold:int, split:str ="train", batch_size:int=None):
@@ -392,10 +392,10 @@ dataset_fold_ref = create_dataset_fold(custom_dataset.ImageDataset_Ref, imgs_pat
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 # # os.environ["NCCL_P2P_DISABLE"] = "1"
 # # # Lightning Training
-# fold = 1
-# tb_logger = pl_loggers.TensorBoardLogger(save_dir=Path("logs"), name="VGG_image_crop_active_groups")#"VGG_image_active")
+# fold = 0
+# tb_logger = pl_loggers.TensorBoardLogger(save_dir=Path("logs"), name="VGG_image_crop_active")#"VGG_image_active")
 # checkpoint_callback = ModelCheckpoint(dirpath=Path("lightning_checkpoint_log"),
-#                                       filename=f"VGG_image_crop_active_groups_fold_{fold}"+"{epoch}-{train_acc:.2f}-{val_acc:.2f}", # f"VGG_image_active_fold_{fold}"+"{epoch}-{train_acc:.2f}-{val_acc:.2f}"
+#                                       filename=f"VGG_image_crop_active_fold_{fold}_"+"{epoch}-{train_acc:.2f}-{val_acc:.2f}", # f"VGG_image_active_fold_{fold}"+"{epoch}-{train_acc:.2f}-{val_acc:.2f}"
 #                                       save_top_k=1,
 #                                       monitor="val_acc",
 #                                       mode="max",
@@ -404,7 +404,7 @@ dataset_fold_ref = create_dataset_fold(custom_dataset.ImageDataset_Ref, imgs_pat
 # torch.set_float32_matmul_precision('medium') #try 'high')
 # seed_everything(42, workers=True)
 
-# lab_dim = 10
+# lab_dim = 4
 # max_epoch = 80
 # lit_model = LightningModelV2(conv_model.VGG_ch,
 #                              model_param=(len(channel), #img_depth
@@ -446,33 +446,6 @@ dataset_fold_ref = create_dataset_fold(custom_dataset.ImageDataset_Ref, imgs_pat
 # Generate Embedding #####################################################################
 """
 
-# model=conv_model.VGG_ch
-# model_path="VGG_image_crop_active_groups_fold_1epoch=77-train_acc=0.86-val_acc=0.77.ckpt"
-# lightning_log_path=Path("lightning_checkpoint_log")
-# extract_emb_layer=slice_sequence_module
-# extract_emb_layer_param={"slice_id": -1}
-# lightning_module=LightningModelV2
-# trained_model = lightning_module.load_from_checkpoint(
-#     checkpoint_path=lightning_log_path / model_path,
-#     model=model).model
-
-# embedding_model, embedding_to_logits_model = tuple(map(lambda model: model.eval(), extract_emb_layer(trained_model,
-#                                                                                                          **extract_emb_layer_param)))
-
-# dataset_args={
-#     "imgs_path": imgs_path,
-#     "channel": id_channel,
-#     "fold_idx": None,
-#     "img_key": "imgs",
-#     "lbl_key": "groups"}
-# dataset = custom_dataset.ImageDataset(
-#     img_transform=v2.Compose([v2.Lambda(lambda img:
-#                                         torch.tensor(img, dtype=torch.float32)),
-#                               v2.Normalize(mean=len(channel)*[0.5],
-#                                            std=len(channel)*[0.5])]),
-#     label_transform=lambda label: torch.tensor(label, dtype=torch.long),
-#     **dataset_args)
-
 def slice_sequence_module(model, slice_id, **kwargs):
     return (
         nn.Sequential(*list(model.sequence.children())[:slice_id]),
@@ -480,7 +453,7 @@ def slice_sequence_module(model, slice_id, **kwargs):
     )
 def compute_embedding(
         model=conv_model.VGG_ch,
-        model_path="VGG_image_crop_active_groups_fold_1epoch=77-train_acc=0.86-val_acc=0.77.ckpt",
+        model_path="VGG_image_crop_active_fold_0_epoch=61-train_acc=0.95-val_acc=0.82.ckpt",
         lightning_log_path = Path("lightning_checkpoint_log"),
         extract_emb_layer = slice_sequence_module,
         extract_emb_layer_param = {"slice_id": 6},
@@ -528,7 +501,7 @@ def compute_embedding(
 
 compute_embedding(
     model=conv_model.VGG_ch,
-    model_path="VGG_image_crop_active_groups_fold_1epoch=77-train_acc=0.86-val_acc=0.77.ckpt",
+    model_path="VGG_image_crop_active_fold_0_epoch=61-train_acc=0.95-val_acc=0.82.ckpt",
     lightning_log_path=Path("lightning_checkpoint_log"),
     extract_emb_layer=slice_sequence_module,
     extract_emb_layer_param={"slice_id": -1},
@@ -538,7 +511,7 @@ compute_embedding(
         "channel": id_channel,
         "fold_idx": None,
         "img_key": "imgs",
-        "lbl_key": "groups"},
+        "lbl_key": "labels"},
     batch_size=256)
 
 """

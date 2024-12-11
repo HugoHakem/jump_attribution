@@ -9,20 +9,20 @@ app = marimo.App(width="full")
 
 
 @app.cell
+def __(mo):
+    mo.md("""<h1 style="text-align: center;">Wellcome to Marimo Explorer</h1>""")
+    return
+
+
+@app.cell
 def __():
     from pathlib import Path
     import polars as pl
 
     # df = pl.read_parquet("/datastore/shared/attribution/data/main_data.parquet")
-    df = pl.read_parquet("/home/hhakem/projects/counterfactuals_projects/workspace/analysis/image_active_crop_dataset/embedding_UMAP2.parquet")
-    df = df.with_columns((pl.col("pred") == pl.col("inchi_id")).alias("correct"))
+    df = pl.read_parquet("/home/hhakem/projects/counterfactuals_projects/workspace/analysis/image_active_crop_dataset/embedding_UMAP3.parquet")
+    df = df.with_columns(pl.when(pl.col("pred") == pl.col("moa_id")).then(pl.lit(1)).otherwise(pl.lit(0)).alias("correct"))
     return Path, df, pl
-
-
-@app.cell
-def __(df, pl):
-    df.select(pl.col("correct").sum()) / len(df)
-    return
 
 
 @app.cell
@@ -45,22 +45,19 @@ def __(Path):
 
 @app.cell
 def __(mo):
+    mo.md("""## Here is a scatter plot of your cell images""")
+    return
+
+
+@app.cell
+def __(df, mo):
     # Get all possible metadata fields for dropdown
-    metadata_fields = [
-        "Metadata_Source",
-        "Metadata_Batch",
-        "moa",
-        "moa_id",
-        "pert_iname",
-        "Metadata_InChIKey",
-        "inchi_id",
-        "pred",
-    ]
-    get_metadata, set_metadata = mo.state(["Metadata_Source"])
+    metadata_fields = list(df.columns)
+    get_metadata, set_metadata = mo.state(["moa_id", "pred"])
     # Create a dropdown for selecting the metadata field
     color_by = mo.ui.multiselect(
         metadata_fields,
-        value=["Metadata_Source"],
+        value=["moa_id", "pred"],
         label="**Color by metadata**",
         max_selections=2,
         on_change=lambda v: set_metadata(v) if len(v) > 0 else None
@@ -77,104 +74,159 @@ def __(mo):
 @app.cell
 def __(alt, get_metadata):
     def scatter(df):
-        scatt_L, hist_L, brush_L = [], [], []
+        scatt_L, hist_L = [], []
+
+        brush = alt.selection_interval(
+            encodings=["x", "y"],
+            on="[mousedown[event.shiftKey], mouseup] > mousemove",
+            translate="[mousedown[event.shiftKey], mouseup] > mousemove!",
+            zoom="wheel![event.shiftKey]",
+        )
+
+        interaction = alt.selection_interval(
+            bind="scales",
+            on="[mousedown[!event.shiftKey], mouseup] > mousemove",
+            translate="[mousedown[!event.shiftKey], mouseup] > mousemove!",
+            zoom="wheel![!event.shiftKey]",
+        )
 
         base_scatter = (alt.Chart(df)
                 .mark_circle(size=10, opacity=0.2)
                 .encode(
                     x=alt.X("UMAP1:Q"),
                     y=alt.Y("UMAP2:Q")
-                ).properties(width=500, height=500))
-        for c in get_metadata():
-            # selector
-            click = alt.selection_point(encodings=["color"])
-            brush = alt.selection_interval()
-
+                ).properties(width=500, height=500)
+                .add_params(brush, interaction))
+        colors = get_metadata()
+        clicks = [alt.selection_point(name=f"click_{i}", encodings=["color"]) for i in range(len(colors))]
+        for i, col in enumerate(colors):
             # scatter and hist
-            scatt = base_scatter.encode(color=alt.Color(f"{c}:N")).add_params(brush)
-            hist = alt.Chart(df).mark_bar().encode(x="count()", y=c, color=alt.condition(click, c, alt.value("lightgray"))).add_params(click).properties(width=500, height=200)
+            scatt = base_scatter.encode(color=alt.Color(f"{col}:N"))#.add_params(brush)
+            hist = (alt.Chart(df)
+                    .mark_bar()
+                    .encode(
+                        x="count()",
+                        y=col, 
+                        color=alt.condition(clicks[i], col, alt.value("lightgray"))
+                    )
+                    .transform_filter(brush, interaction, *tuple(clicks[slice(0, i)] + clicks[slice(i+1, None)]))
+                    .add_params(clicks[i])
+                    .properties(width=500, height=200)
+                   )
 
             scatt_L.append(scatt)
             hist_L.append(hist)
-            brush_L.append(brush)
-        for i in range(len(hist_L)):
-            hist_L[i] = hist_L[i].transform_filter(*brush_L)
+
         concat_L = list(map(lambda tup: alt.vconcat(*tup), zip(scatt_L, hist_L)))
         return alt.hconcat(*concat_L).resolve_scale(color="independent")#.add_params(brush)
+        # concat = alt.vconcat(scatt_1, hist_2)
+        # return concat
     return (scatter,)
 
 
 @app.cell
 def __(df, mo, scatter):
-    chart = mo.ui.altair_chart(scatter(df.to_pandas()))
-    chart
+    chart = mo.ui.altair_chart(scatter(df.to_pandas()),
+        # disable automatic selection
+        chart_selection=False,
+        legend_selection=False)
+    mo.md(f"""
+    You can Navigate the scatter plot with your mouse:
+
+    - click and move -> move the plot window
+    - scroll up -> zoom in
+    - scroll down -> zoom down
+
+    By pressing on SHIFT, you switch from scale control to box selection control: 
+
+    - click and move -> draw a selection box
+    - click on the selection box -> move the selection box
+    - scroll up -> expand the box
+    - scroll down -> squeeze the box
+
+    By pressing on SHIFT and then clicking on desired categories of the bar plot, you can filter out categories.
+    {chart}
+    """)
     return (chart,)
 
 
 @app.cell
-def __(chart, load_image_channel, np):
-    # load images
-    channel_id_selected = list(range(5))
-    raw_images = np.stack([load_image_channel(x, tuple(channel_id_selected)) for x in list(chart.value["img_id"])], axis=0)
-    pixels = raw_images.reshape(len(chart.value), 5, -1)
-    return channel_id_selected, pixels, raw_images
+def __(chart, compute_pixel_distribution, mo):
+    trigger_hist_comp = mo.ui.button(kind="warn", label="**Compute image histogram**", on_click=lambda v: compute_pixel_distribution(), disabled=not len(chart.value))
+    mo.md(f"""
+    Trigger pixel distribution computation of selected images:
+
+    {trigger_hist_comp} {f'**Warning: this is the intended number of image to load: {len(chart.value)}.**' if len(chart.value) else ''}
+    """)
+    return (trigger_hist_comp,)
 
 
 @app.cell
-def __(channel_id_selected, chart, indices_to_channel, np, pixels, pl):
+def __(trigger_hist_comp):
+    trigger_hist_comp.value
+    return
+
+
+@app.cell
+def __(
+    alt,
+    chart,
+    df,
+    get_metadata,
+    indices_to_channel,
+    load_image_channel,
+    np,
+    pl,
+):
+    # # load images
     import operator
-    # compute pixel_count according bins
-    num_bins = 80
-    bins = np.round(np.linspace(0, 1, num_bins + 1), 5)
-    pixel_count = np.stack(list(map(lambda id: np.stack(list(map(lambda ch: np.histogram(pixels[id][ch], bins=bins)[0], channel_id_selected))), range(pixels.shape[0]))))
-    pixel_count_df = pl.DataFrame({
-        "img_id": np.repeat(list(chart.value["img_id"]), pixel_count[0].size),
-        "channel": np.tile(np.repeat([indices_to_channel[i] for i in np.arange(5)], pixel_count.shape[-1]), pixel_count.shape[0]),
-        "pixel_count": pixel_count.reshape(-1),
-        "bin_start": np.tile(bins[:-1], operator.mul(*pixel_count.shape[:-1])),  # Start of bins
-        "bin_end": np.tile(bins[1:], operator.mul(*pixel_count.shape[:-1]))
-    })
-    return bins, num_bins, operator, pixel_count, pixel_count_df
+    def compute_pixel_distribution():
+        # load images
+        channel_id_selected = list(range(5))
+        raw_images = np.stack([load_image_channel(x, tuple(channel_id_selected)) for x in list(chart.value["img_id"])], axis=0)
+        pixels = raw_images.reshape(len(chart.value), 5, -1)
 
+        # compute histogram
+        num_bins = 80
+        bins = np.round(np.linspace(0, 1, num_bins + 1), 5)
+        pixel_count = np.stack(list(map(lambda id: np.stack(list(map(lambda ch: np.histogram(pixels[id][ch], bins=bins)[0], channel_id_selected))), range(pixels.shape[0]))))
+        pixel_count_df = pl.DataFrame({
+            "img_id": np.repeat(list(chart.value["img_id"]), pixel_count[0].size),
+            "channel": np.tile(np.repeat([indices_to_channel[i] for i in np.arange(5)], pixel_count.shape[-1]), pixel_count.shape[0]),
+            "pixel_count": pixel_count.reshape(-1),
+            "bin_start": np.tile(bins[:-1], operator.mul(*pixel_count.shape[:-1])),  # Start of bins
+            "bin_end": np.tile(bins[1:], operator.mul(*pixel_count.shape[:-1]))
+        })
 
-@app.cell
-def __(df, pixel_count_df, pl):
-    # group per metadata
-    metadata = ["Metadata_Source", "pert_iname"]
-    pixel_count_df_grouped = (pixel_count_df
-                              .join(
-                                  other=df.select(pl.col(["img_id"] + metadata)),
-                                  on="img_id",
-                                  how="left"
-                              )
-                              .group_by(pl.col(metadata + ["channel", "bin_start", "bin_end"]))
-                              .agg(pl.col("pixel_count").sum())
-                              .with_columns(
-                                  (pl.col("pixel_count") / pl.col("pixel_count").sum().over(metadata + ["channel"])).alias("pixel_freq")
-                              ))
-    return metadata, pixel_count_df_grouped
-
-
-@app.cell
-def __(alt, metadata, pixel_count_df_grouped):
-    ax = (alt.Chart(pixel_count_df_grouped)
-     .mark_bar(
-         opacity=0.3,
-         binSpacing=0
-    ).encode(
-        x=alt.X('bin_start:Q', bin='binned', title='Value Range'),
-        x2='bin_end:Q',  # Use x2 for the bin range
-        y=alt.Y('pixel_freq:Q', title='Frequency').stack(None),
-        column=alt.Column('channel:N', title='Channel'),
-        color=alt.Color(f"{metadata[0]}:N", title=f"{metadata[0]}"),
-        row=alt.Row(f"{metadata[1]}:N", title=f"{metadata[1]}")
-    ).properties(
-        title='Histogram'
-        # width=600,
-        # height=400
-    ))
-    ax
-    return (ax,)
+        # group per metadata
+        metadata_L = get_metadata()
+        pixel_count_df_grouped = (pixel_count_df
+                                  .join(
+                                      other=df.select(pl.col(["img_id"] + metadata_L)),
+                                      on="img_id",
+                                      how="left"
+                                  )
+                                  .group_by(pl.col(metadata_L + ["channel", "bin_start", "bin_end"]))
+                                  .agg(pl.col("pixel_count").sum())
+                                  .with_columns(
+                                      (pl.col("pixel_count") / pl.col("pixel_count").sum().over(metadata_L + ["channel"])).alias("pixel_freq")
+                                  ))
+        ax = (alt.Chart(pixel_count_df_grouped)
+              .mark_bar(
+                  opacity=0.3,
+                  binSpacing=0
+              ).encode(
+                  x=alt.X('bin_start:Q', bin='binned', title='Value Range'),
+                  x2='bin_end:Q',  # Use x2 for the bin range
+                  y=alt.Y('pixel_freq:Q', title='Frequency').stack(None),
+                  column=alt.Column('channel:N', title='Channel'),
+                  color=alt.Color(f"{metadata_L[0]}:N", title=f"{metadata_L[0]}"),
+              ).properties(
+                  title='Histogram'))
+        if len(metadata_L) > 1:
+            ax.encode(row=alt.Row(f"{metadata_L[1]}:N", title=f"{metadata_L[1]}"))
+        return ax
+    return compute_pixel_distribution, operator
 
 
 @app.cell
@@ -211,10 +263,11 @@ def __(mo):
 
 
 @app.cell
-def __(clip_outliers, mo):
-    # Normalize button available if image clipped
+def __(chart, clip_outliers, max_images_, mo, np):
+    # Normalize button available if image clipped & slice selector
     normalize = mo.ui.button(value=False, kind="neutral", label="**Normalize**", on_click=lambda v: not v, disabled=not clip_outliers.value)
-    return (normalize,)
+    slice_selector = mo.ui.number(start=0, stop=int(np.ceil(len(chart.value) / max_images_.value)))
+    return normalize, slice_selector
 
 
 @app.cell
@@ -263,31 +316,6 @@ def __(chart, mo):
 
 
 @app.cell
-def __():
-    # import seaborn as sns
-    # col_to_plot = "Metadata_Source"
-    # # Modify here
-    # data_type = table.data.loc[:,col_to_plot].iloc[:8].values
-    # pixels = raw_images.reshape(8,raw_images.shape[1], -1).swapaxes(0,1)
-    # d = {f"{i}_{j}":[] for i in range(len(pixels)) for j in range(pixels.shape[1])}
-    # for i in range(len(pixels)):
-    #     for j in range(pixels.shape[1]):
-    #         d[f"{i}_{j}"] += pixels[i,j].reshape(-1).tolist()
-    # map_channel_id = {i:ch for i, ch in enumerate(map_channel_default.keys()) if channel_checkboxes[i].value}
-    # map_activated_label = {i:v for i,v in enumerate(map_channel_id.values())}
-    # selected_df=(pl.DataFrame(d).unpivot()
-    #                      .with_columns(pl.col("variable")
-    #                                    .str.split("_").list.to_struct(n_field_strategy="max_width"))
-    #                      .unnest("variable").with_columns(pl.col("field_0").replace(map_activated_label).alias("Channel"), 
-    #                                                       pl.col("field_1").replace({i:v for i,v in enumerate(data_type)}).alias("Source")))
-
-    # ax = sns.displot(selected_df.to_pandas(), x="value", col="Channel", hue="Source")
-    # plt.ylim(0,2000)
-    # ax
-    return
-
-
-@app.cell
 def __(
     channel_multiselect,
     channel_to_indices,
@@ -301,6 +329,7 @@ def __(
     mo,
     normalize,
     np,
+    slice_selector,
     table,
 ):
     import math
@@ -331,7 +360,7 @@ def __(
 
     # Function to show images with the selected channels
     def show_images(indices, max_images=8):
-        indices = indices[:max_images]
+        indices = indices[slice(int(max_images * slice_selector.value), int(max_images * (1 + slice_selector.value)))]
 
         selected_channel = get_channel()
         selected_channel_indices = [channel_to_indices[ch] for ch in selected_channel]
@@ -373,6 +402,9 @@ def __(
         **Max Image:**
         {max_images_}
 
+        **Select image slice:**
+        {slice_selector}
+
         **Select Channels:**
         {channel_multiselect}
 
@@ -411,11 +443,6 @@ async def __():
 def __():
     import marimo as mo
     return (mo,)
-
-
-@app.cell
-def __():
-    return
 
 
 if __name__ == "__main__":
