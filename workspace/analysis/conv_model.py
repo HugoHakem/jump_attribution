@@ -310,7 +310,7 @@ class Discriminator(nn.Module):
     def __init__(self, img_size=256, num_channels=3, num_domains=2, dim_in=64, style_dim=64, num_block=6, max_conv_dim=512):
         super().__init__()
         blocks = []
-        blocks += [nn.Conv2d(3, dim_in, 3, 1, 1)]
+        blocks += [nn.Conv2d(num_channels, dim_in, 3, 1, 1)]
 
         for _ in range(num_block):
             dim_out = min(dim_in*2, max_conv_dim)

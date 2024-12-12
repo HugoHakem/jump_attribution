@@ -1,23 +1,21 @@
 import lightning as L
-
-import numpy as np
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
-from more_itertools import unzip
+import numpy as np
 import torch
-import torch.nn.functional as F
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
-import torchvision
-
-from munch import Munch #Munch is a dictionary that supports attribute-style access, a la JavaScript
-
-from torch.nn.functional import cross_entropy, l1_loss, binary_cross_entropy_with_logits, sigmoid
-
-
+from more_itertools import unzip
+from munch import \
+    Munch  # Munch is a dictionary that supports attribute-style access, a la JavaScript
+from torch.nn.functional import (binary_cross_entropy_with_logits,
+                                 cross_entropy, l1_loss)
 ## WORK WITH TORCH METRIC FROM LIGHTNING INSTEAD
-from torchmetrics.classification import (
-    MulticlassAUROC, MulticlassAccuracy, MulticlassF1Score, MulticlassConfusionMatrix, BinaryAccuracy)
-
+from torchmetrics.classification import (MulticlassAccuracy,
+                                         MulticlassAUROC,
+                                         MulticlassConfusionMatrix,
+                                         MulticlassF1Score)
 
 
 class LightningModel(L.LightningModule):
@@ -45,7 +43,7 @@ class LightningModel(L.LightningModule):
         loss = cross_entropy(output, target)
         #save output
         self.training_step_outputs.append((output, target))
-        
+
         # logs metrics for each training_step,
         # and the average across the epoch, to the progress bar and logger
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
@@ -88,12 +86,12 @@ class LightningModel(L.LightningModule):
 
     def _shared_eval(self, prefix_step_outputs, prefix):
         all_preds, all_labels = map(lambda x: list(x), unzip(prefix_step_outputs))
-        (all_preds, all_labels) = (self.all_gather(torch.vstack(all_preds)).view(-1, self.n_class), 
+        (all_preds, all_labels) = (self.all_gather(torch.vstack(all_preds)).view(-1, self.n_class),
                                    self.all_gather(torch.hstack(all_labels)).view(-1))
 
         if self.apply_softmax:
             all_preds = nn.Softmax(dim=1)(all_preds)
-        
+
         if self.trainer.is_global_zero:
             self.log(prefix + "_" + "acc", self.accuracy[self.prefix_to_id[prefix]](all_preds, all_labels),
                      rank_zero_only=True)
@@ -101,10 +99,10 @@ class LightningModel(L.LightningModule):
                      rank_zero_only=True)
             self.log(prefix + "_" + "f1", self.f1[self.prefix_to_id[prefix]](all_preds, all_labels),
                      rank_zero_only=True)
-                             
+
             # if self.current_epoch==self.max_epoch-1:
-            #     self.log(prefix + "_ConfusionMatrix", 
-            #              MulticlassConfusionMatrix(num_classes=self.n_class)(all_preds, all_labels), 
+            #     self.log(prefix + "_ConfusionMatrix",
+            #              MulticlassConfusionMatrix(num_classes=self.n_class)(all_preds, all_labels),
             #              rank_zero_only=True,
             #              sync_dist=True)
 
@@ -344,7 +342,7 @@ class LightningModelV3(L.LightningModule):
                      rank_zero_only=True,
                      sync_dist=True)
 
-    
+
 class LightningGAN(L.LightningModule):
     def __init__(
             self,
@@ -747,6 +745,7 @@ class LightningStarGANV2(L.LightningModule):
             weight_loss,
             beta_moving_avg,
             latent_dim,
+            channel: list[str]|None=None
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["generator","mapping_network", "style_encoder", "discriminator"])
@@ -773,6 +772,9 @@ class LightningStarGANV2(L.LightningModule):
         self.initial_lambda_ds = self.weight_loss.lambda_ds
         self.beta_moving_avg = beta_moving_avg
         self.latent_dim = latent_dim
+
+        # Define channel for plotting:
+        self.channel = channel
 
         # Accuracy
         # self.train_accuracy_true = BinaryAccuracy()
@@ -993,6 +995,44 @@ class LightningStarGANV2(L.LightningModule):
                 # self.log_images_with_colormap(x_real, y_org, x_ref, x_ref2, y_trg, z_trg, z_trg2,
                 #                               num=min(y_org.size(0), 5), plot_ema=False, step=current_step)
 
+    def channel_to_rgb(self,
+                       img_array: np.ndarray,
+                       channel: list[str]|None=None,
+                       channel_last: bool=True):
+
+
+        if img_array.ndim not in {3, 4}:
+            raise Exception(
+                f"input array should have shape (sample, C, H, W) or (C, H, W).\n"
+                f"Here input shape: {img_array.shape}")
+        if img_array.shape[-3] > len(channel):
+            raise Exception(f"input array should have shape (sample, C, H, W) or (C, H, W) with C <= 5.\n"
+                            f"Here input shape: {img_array.shape}\n"
+                            f"And C: {img_array.shape[-3]}")
+        if channel is None:
+            # if no channel provided, assume no transformation required.
+            img_array_rgb = img_array
+            if channel_last:
+                img_array_rgb = np.moveaxis(img_array_rgb, -3, -1)
+            return img_array_rgb.clip(0, 1) # to ensure correct window value
+
+        map_channel_color = {
+            "AGP": "#FF7F00", #"#FFA500", # Orange
+            "DNA": "#0000FF", # Blue
+            "ER": "#00FF00", #"#65fe08" # Green
+            "Mito": "#FF0000", # Red
+            "RNA": "#FFFF00" # Yellow
+            }
+
+        channel_rgb_weight = np.vstack(list(map(lambda ch: list(mcolors.to_rgb(map_channel_color[ch])), channel)))
+        img_array_rgb = np.tensordot(img_array, channel_rgb_weight, axes=[[-3], [0]])
+        # tensordot give img in (sample, H, W, C) or (H, W, C)
+        # we normalize and rotate for the sake of consistency with input
+        norm_rgb = np.maximum(channel_rgb_weight.sum(axis=0), np.ones(3))
+        img_array_rgb = img_array_rgb / norm_rgb
+        if not channel_last:
+            img_array_rgb = np.moveaxis(img_array_rgb, -1, -3)
+        return img_array_rgb.clip(0, 1) # to ensure correct window value
 
     def log_images_with_colormap(self, x_real, y_org, x_ref, x_ref2, y_trg, z_trg, z_trg2, num=4, plot_ema=True, step=0):
         # load ema weight
@@ -1007,32 +1047,32 @@ class LightningStarGANV2(L.LightningModule):
         fig, axs = plt.subplots(num * 2, 4, figsize=(30, 70), squeeze=False)
         with torch.no_grad():
             x_fake_ref = self.generator(x_real, self.style_encoder(x_ref, y_trg))
-            x_fake_ref2 = self.denormalize_img(self.generator(x_real, self.style_encoder(x_ref2, y_trg))).permute(0, 2, 3, 1).cpu().float().numpy()
-            x_fake_lat = self.denormalize_img(self.generator(x_real, self.mapping_network(z_trg, y_trg))).permute(0, 2, 3, 1).cpu().float().numpy()
-            x_fake_lat2 = self.denormalize_img(self.generator(x_real, self.mapping_network(z_trg2, y_trg))).permute(0, 2, 3, 1).cpu().float().numpy()
-            x_cycle = self.denormalize_img(self.generator(x_fake_ref, self.style_encoder(x_real, y_org))).permute(0, 2, 3, 1).cpu().float().numpy()
-            x_fake_ref = self.denormalize_img(x_fake_ref).permute(0, 2, 3, 1).cpu().float().numpy()
-            x_real = self.denormalize_img(x_real).permute(0, 2, 3, 1).cpu().float().numpy()
-            x_ref = self.denormalize_img(x_ref).permute(0, 2, 3, 1).cpu().float().numpy()
-            x_ref2 = self.denormalize_img(x_ref2).permute(0, 2, 3, 1).cpu().float().numpy()
+            x_fake_ref2 = self.denormalize_img(self.generator(x_real, self.style_encoder(x_ref2, y_trg))).cpu().float().numpy()#.permute(0, 2, 3, 1).cpu().float().numpy()
+            x_fake_lat = self.denormalize_img(self.generator(x_real, self.mapping_network(z_trg, y_trg))).cpu().float().numpy()#.permute(0, 2, 3, 1).cpu().float().numpy()
+            x_fake_lat2 = self.denormalize_img(self.generator(x_real, self.mapping_network(z_trg2, y_trg))).cpu().float().numpy()#.permute(0, 2, 3, 1).cpu().float().numpy()
+            x_cycle = self.denormalize_img(self.generator(x_fake_ref, self.style_encoder(x_real, y_org))).cpu().float().numpy()#.permute(0, 2, 3, 1).cpu().float().numpy()
+            x_fake_ref = self.denormalize_img(x_fake_ref).cpu().float().numpy()#.permute(0, 2, 3, 1).cpu().float().numpy()
+            x_real = self.denormalize_img(x_real).cpu().float().numpy()#.permute(0, 2, 3, 1).cpu().float().numpy()
+            x_ref = self.denormalize_img(x_ref).cpu().float().numpy()#.permute(0, 2, 3, 1).cpu().float().numpy()
+            x_ref2 = self.denormalize_img(x_ref2).cpu().float().numpy()#.permute(0, 2, 3, 1).cpu().float().numpy()
             y_org = y_org.cpu().numpy()
             y_trg = y_trg.cpu().numpy()
             for i in range(num):
-                axs[2*i][0].imshow(x_real[i])
+                axs[2*i][0].imshow(self.channel_to_rgb(x_real[i], self.channel, channel_last=True))
                 axs[2*i][0].set_title(f"Input image - Class_{y_org[i]}")
-                axs[2*i][1].imshow(x_ref[i])
+                axs[2*i][1].imshow(self.channel_to_rgb(x_ref[i], self.channel, channel_last=True))
                 axs[2*i][1].set_title(f"Ref image 1 - Class_{y_trg[i]}")
-                axs[2*i][2].imshow(x_fake_ref[i])
+                axs[2*i][2].imshow(self.channel_to_rgb(x_fake_ref[i], self.channel, channel_last=True))
                 axs[2*i][2].set_title(f"Generated image from ref1 - Class_{y_trg[i]}")
-                axs[2*i][3].imshow(x_fake_lat[i])
+                axs[2*i][3].imshow(self.channel_to_rgb(x_fake_lat[i], self.channel, channel_last=True))
                 axs[2*i][3].set_title(f"Generated image from lat1 - Class_{y_trg[i]}")
-                axs[2*i+1][0].imshow(x_cycle[i])
+                axs[2*i+1][0].imshow(self.channel_to_rgb(x_cycle[i], self.channel, channel_last=True))
                 axs[2*i+1][0].set_title(f"Cycled image - from ref1 Class_{y_org[i]}")
-                axs[2*i+1][1].imshow(x_ref2[i])
+                axs[2*i+1][1].imshow(self.channel_to_rgb(x_ref2[i], self.channel, channel_last=True))
                 axs[2*i+1][1].set_title(f"Ref image 2 - Class_{y_trg[i]}")
-                axs[2*i+1][2].imshow(x_fake_ref2[i])
+                axs[2*i+1][2].imshow(self.channel_to_rgb(x_fake_ref2[i], self.channel, channel_last=True))
                 axs[2*i+1][2].set_title(f"Generated image from ref2 - Class_{y_trg[i]}")
-                axs[2*i+1][3].imshow(x_fake_lat2[i])
+                axs[2*i+1][3].imshow(self.channel_to_rgb(x_fake_lat2[i], self.channel, channel_last=True))
                 axs[2*i+1][3].set_title(f"Generated image from lat2 - Class_{y_trg[i]}")
 
         for ax in axs.flatten():
@@ -1048,12 +1088,14 @@ class LightningStarGANV2(L.LightningModule):
             preffix = ""
 
         # save the figure as a TensorBoard image
+        fig.tight_layout()
         self.logger.experiment.add_figure("train/" + preffix + "generated_images", fig, step)
         plt.close(fig)
 
     def denormalize_img(self, x):
         out = (x + 1) / 2
         return out.clamp_(0, 1)
+
     def configure_optimizers(self):
         opt_g = torch.optim.Adam(self.generator.parameters(), **self.adam_param_g)
         opt_m = torch.optim.Adam(self.mapping_network.parameters(), **self.adam_param_m)

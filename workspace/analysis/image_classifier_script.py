@@ -432,13 +432,14 @@ dataset_fold_ref = create_dataset_fold(custom_dataset.ImageDataset_Ref, imgs_pat
 #                     callbacks=[checkpoint_callback],
 #                     #enable_checkpointing=False,
 #                     enable_progress_bar=False
+#                     # log_every_n_steps=45
 #                     #deterministic=True #using along with torchmetric: it slow down process as it apparently rely
 #                     #on some cumsum which is not permitted in deterministic on GPU and then transfer to CPU
 #                     )
 
 # soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
 # resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
-# batch_size = 256 #128
+# batch_size = 256 #256 #128
 # trainer.fit(lit_model, DataLoader(dataset_fold[fold]["train"], batch_size=batch_size, num_workers=1, shuffle=True, persistent_workers=True),
 #             DataLoader(dataset_fold[fold]["val"], batch_size=batch_size, num_workers=1, persistent_workers=True))
 
@@ -446,154 +447,156 @@ dataset_fold_ref = create_dataset_fold(custom_dataset.ImageDataset_Ref, imgs_pat
 # Generate Embedding #####################################################################
 """
 
-def slice_sequence_module(model, slice_id, **kwargs):
-    return (
-        nn.Sequential(*list(model.sequence.children())[:slice_id]),
-        nn.Sequential(*list(model.sequence.children())[slice_id:])
-    )
-def compute_embedding(
-        model=conv_model.VGG_ch,
-        model_path="VGG_image_crop_active_fold_0_epoch=61-train_acc=0.95-val_acc=0.82.ckpt",
-        lightning_log_path = Path("lightning_checkpoint_log"),
-        extract_emb_layer = slice_sequence_module,
-        extract_emb_layer_param = {"slice_id": 6},
-        lightning_module = LightningModelV2,
-        dataset_args={"imgs_path": Path("image_active_crop_dataset/imgs_labels_groups.zarr"),
-                      "channel": np.arange(5),
-                      "fold_idx": None,
-                      "img_key": "imgs",
-                      "lbl_key": "groups"},
-        batch_size=256):
+# def slice_sequence_module(model, slice_id, **kwargs):
+#     return (
+#         nn.Sequential(*list(model.sequence.children())[:slice_id]),
+#         nn.Sequential(*list(model.sequence.children())[slice_id:])
+#     )
+# def compute_embedding(
+#         model=conv_model.VGG_ch,
+#         model_path="VGG_image_crop_active_fold_0_epoch=61-train_acc=0.95-val_acc=0.82.ckpt",
+#         lightning_log_path = Path("lightning_checkpoint_log"),
+#         extract_emb_layer = slice_sequence_module,
+#         extract_emb_layer_param = {"slice_id": 6},
+#         lightning_module = LightningModelV2,
+#         dataset_args={"imgs_path": Path("image_active_crop_dataset/imgs_labels_groups.zarr"),
+#                       "channel": np.arange(5),
+#                       "fold_idx": None,
+#                       "img_key": "imgs",
+#                       "lbl_key": "groups"},
+#         batch_size=256):
 
-    dataset = custom_dataset.ImageDataset(
-        img_transform=v2.Compose([v2.Lambda(lambda img:
-                                            torch.tensor(img, dtype=torch.float32)),
-                                  v2.Normalize(mean=len(channel)*[0.5],
-                                               std=len(channel)*[0.5])]),
-        label_transform=lambda label: torch.tensor(label, dtype=torch.long),
-        **dataset_args
+#     dataset = custom_dataset.ImageDataset(
+#         img_transform=v2.Compose([v2.Lambda(lambda img:
+#                                             torch.tensor(img, dtype=torch.float32)),
+#                                   v2.Normalize(mean=len(channel)*[0.5],
+#                                                std=len(channel)*[0.5])]),
+#         label_transform=lambda label: torch.tensor(label, dtype=torch.long),
+#         **dataset_args
 
-    )
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    trained_model = lightning_module.load_from_checkpoint(
-        checkpoint_path=lightning_log_path / model_path,
-        model=model).model
-    embedding_model, embedding_to_logits_model = tuple(map(lambda model: model.to(device).eval(), extract_emb_layer(trained_model,
-                                                                                                             **extract_emb_layer_param)))
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-    embedding_stack, y_hat_stack = [], []
-    with torch.no_grad():
-        for X, y in tqdm(dataloader, desc="batch"):
-            X, y = X.to(device), y.to(device)
-            embedding = embedding_model(X)
-            logits = embedding_to_logits_model(embedding)
-            y_hat = torch.argmax(nn.Softmax(dim=1)(logits), dim=1)
-            embedding_stack.append(embedding.cpu().numpy())
-            y_hat_stack.append(y_hat.cpu().numpy())
-    embedding_df = (
-        pl.DataFrame(
-            np.hstack([np.hstack(y_hat_stack)[:, None], np.vstack(embedding_stack)])
-        )
-        .with_columns(pl.col("column_0").cast(int))
-        .rename({"column_0": "pred"})
-        )
-    embedding_df.write_csv(imgs_folder / ("embedding_" + model_path[:-4] + "csv"))
+#     )
+#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#     trained_model = lightning_module.load_from_checkpoint(
+#         checkpoint_path=lightning_log_path / model_path,
+#         model=model).model
+#     embedding_model, embedding_to_logits_model = tuple(map(lambda model: model.to(device).eval(), extract_emb_layer(trained_model,
+#                                                                                                              **extract_emb_layer_param)))
+#     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=1, persistent_workers=True)
+#     embedding_stack, y_hat_stack = [], []
+#     with torch.no_grad():
+#         for X, y in tqdm(dataloader, desc="batch"):
+#             X, y = X.to(device), y.to(device)
+#             embedding = embedding_model(X)
+#             logits = embedding_to_logits_model(embedding)
+#             y_hat = torch.argmax(nn.Softmax(dim=1)(logits), dim=1)
+#             embedding_stack.append(embedding.cpu().numpy())
+#             y_hat_stack.append(y_hat.cpu().numpy())
+#     embedding_df = (
+#         pl.DataFrame(
+#             np.hstack([np.hstack(y_hat_stack)[:, None], np.vstack(embedding_stack)])
+#         )
+#         .with_columns(pl.col("column_0").cast(int))
+#         .rename({"column_0": "pred"})
+#         )
+#     embedding_df.write_csv(imgs_folder / ("embedding_" + model_path[:-4] + "csv"))
 
-compute_embedding(
-    model=conv_model.VGG_ch,
-    model_path="VGG_image_crop_active_fold_0_epoch=61-train_acc=0.95-val_acc=0.82.ckpt",
-    lightning_log_path=Path("lightning_checkpoint_log"),
-    extract_emb_layer=slice_sequence_module,
-    extract_emb_layer_param={"slice_id": -1},
-    lightning_module=LightningModelV2,
-    dataset_args={
-        "imgs_path": imgs_path,
-        "channel": id_channel,
-        "fold_idx": None,
-        "img_key": "imgs",
-        "lbl_key": "labels"},
-    batch_size=256)
+# compute_embedding(
+#     model=conv_model.VGG_ch,
+#     model_path="VGG_image_crop_active_fold_0_epoch=61-train_acc=0.95-val_acc=0.82.ckpt", #"VGG_image_crop_active_contrast_fold_0_epoch=58-train_acc=0.93-val_acc=0.85.ckpt"
+#     lightning_log_path=Path("lightning_checkpoint_log"),
+#     extract_emb_layer=slice_sequence_module,
+#     extract_emb_layer_param={"slice_id": -1},
+#     lightning_module=LightningModelV2,
+#     dataset_args={
+#         "imgs_path": imgs_path,
+#         "channel": id_channel,
+#         "fold_idx": None,
+#         "img_key": "imgs", # imgs
+#         "lbl_key": "labels"},
+#     batch_size=256)
 
 """
 # GANs Training #####################################################################
 """
 
 
-# # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-# # os.environ["NCCL_P2P_DISABLE"] = "1"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["NCCL_P2P_DISABLE"] = "1"
 
-# # # Some parameter definition
-# # fold=0
-# # img_size = 448
-# # num_domains = 4 #n_class
-# # max_epoch = 30
-# # latent_dim = 16
-# # style_dim = 64
+# Some parameter definition
+fold=0
+img_size = 128 # 448
+num_domains = 4 #n_class
+max_epoch = 35
+latent_dim = 16
+style_dim = 64
 
-# # # # Lightning Training
-# # tb_logger = pl_loggers.TensorBoardLogger(save_dir=Path("logs"), name="StarGANv2_image_active")
-# # checkpoint_callback = ModelCheckpoint(dirpath=Path("lightning_checkpoint_log"),
-# #                                       filename=f"StarGANv2_image_active_fold_{fold}_"+"{epoch}-{step}", #-{train_acc_true:.2f}-{train_acc_fake:.2f}",
-# #                                       #save_top_k=1,
-# #                                       #monitor="val_acc",
-# #                                       #mode="max",
-# #                                       every_n_train_steps=50)
-# #                                       #every_n_epochs=1)
+# # Lightning Training
+tb_logger = pl_loggers.TensorBoardLogger(save_dir=Path("logs"), name="StarGANv2_image_crop_active")
+checkpoint_callback = ModelCheckpoint(dirpath=Path("lightning_checkpoint_log"),
+                                      filename=f"StarGANv2_image_crop_active_fold_{fold}_"+"{epoch}-{step}", #-{train_acc_true:.2f}-{train_acc_fake:.2f}",
+                                      #monitor="val_acc",
+                                      #mode="max",
+                                      every_n_train_steps=50,
+                                      enable_version_counter=True)
+                                      #every_n_epochs=1)
 
-# # torch.set_float32_matmul_precision('medium') #try 'high')
-# # seed_everything(42, workers=True)
+torch.set_float32_matmul_precision('medium') #try 'high')
+seed_everything(42, workers=True)
 
-# # lit_model = LightningStarGANV2(
-# #     conv_model.Generator, # generator
-# #     conv_model.MappingNetwork, # mapping_network
-# #     conv_model.StyleEncoder, # style_encoder
-# #     conv_model.Discriminator, # discriminator
-# #     {"num_channels": len(channel), "dim_in": 64, "style_dim": style_dim, "num_block": 4, "max_conv_dim": 512}, # generator_param
-# #     {"latent_dim": latent_dim, "style_dim": 64, "num_domains": num_domains}, # mapping_network
-# #     {"img_size": img_size, "num_channels": len(channel), "num_domains": num_domains, "dim_in": 64, "style_dim": style_dim,
-# #      "num_block": 4, "max_conv_dim": 512}, # style_encoder_param
-# #     {"img_size": img_size, "num_channels": len(channel), "num_domains": num_domains, "dim_in": 64, "style_dim": style_dim,
-# #      "num_block": 4, "max_conv_dim": 512}, # discriminator_param,
-# #     {"lr": 1e-4, "betas": (0, 0.99)}, # adam_param_g G
-# #     {"lr": 1e-6, "betas": (0, 0.99)}, # adam_param_m F
-# #     {"lr": 1e-4, "betas": (0, 0.99)}, # adam_param_s E
-# #     {"lr": 1e-4, "betas": (0, 0.99)}, # adam_param_d D
-# #     {"lambda_cyc": 1,  "lambda_sty": 1, "lambda_ds": 1, "lambda_reg": 1}, # weight_loss (eventually tweak lambda_ds (original authors set it to 1 for CelebaHQ and 2 for AFHQ))
-# #     {"generator": 0.999,"mapping_network": 0.999, "style_encoder": 0.999}, # beta_moving_avg (Looks 0.99 to 0.999 looks to have better behavior)
-# #     latent_dim)# latent_dim
+lit_model = LightningStarGANV2(
+    conv_model.Generator, # generator
+    conv_model.MappingNetwork, # mapping_network
+    conv_model.StyleEncoder, # style_encoder
+    conv_model.Discriminator, # discriminator
+    {"num_channels": len(channel), "dim_in": 64, "style_dim": style_dim, "num_block": 3, "max_conv_dim": 512}, # generator_param with 448: num_block = 4
+    {"latent_dim": latent_dim, "style_dim": 64, "num_domains": num_domains}, # mapping_network
+    {"img_size": img_size, "num_channels": len(channel), "num_domains": num_domains, "dim_in": 64, "style_dim": style_dim,
+     "num_block": 5, "max_conv_dim": 512}, # style_encoder_param with 448: num_block = 4
+    {"img_size": img_size, "num_channels": len(channel), "num_domains": num_domains, "dim_in": 64, "style_dim": style_dim,
+     "num_block": 5, "max_conv_dim": 512}, # discriminator_param with 448: num_block = 4
+    {"lr": 1e-4, "betas": (0, 0.99)}, # adam_param_g G
+    {"lr": 1e-6, "betas": (0, 0.99)}, # adam_param_m F
+    {"lr": 1e-4, "betas": (0, 0.99)}, # adam_param_s E
+    {"lr": 1e-4, "betas": (0, 0.99)}, # adam_param_d D
+    {"lambda_cyc": 1,  "lambda_sty": 1, "lambda_ds": 1, "lambda_reg": 1}, # weight_loss (eventually tweak lambda_ds (original authors set it to 1 for CelebaHQ and 2 for AFHQ))
+    {"generator": 0.999,"mapping_network": 0.999, "style_encoder": 0.999}, # beta_moving_avg (Looks 0.99 to 0.999 looks to have better behavior)
+    latent_dim,
+    channel=channel #None
 
-# # batch_size = 8 #len(dataset_fold[fold]["train"])
+)# latent_dim
 
-# # # from lightning.pytorch.strategies import DDPStrategy
+batch_size = 32 #8 #len(dataset_fold[fold]["train"])
 
-# # trainer = L.Trainer(
-# #                     accelerator="gpu",
-# #                     devices=2,
-# #                     precision="bf16-mixed",
-# #                     #strategy="ddp_notebook",
-# #                     strategy="ddp_find_unused_parameters_true",#DDPStrategy(static_graph=True)
-# #                     max_epochs=max_epoch,
-# #                     logger=tb_logger,
-# #                     #num_sanity_val_steps=2, #to use only if you know the trainer is working !
-# #                     callbacks=[checkpoint_callback],
-# #                     #enable_checkpointing=False,
-# #                     enable_progress_bar=True,
-# #                     log_every_n_steps=1,
-# #                     deterministic=True
-# #                     #profiler="simple"
-# #                     )
+# from lightning.pytorch.strategies import DDPStrategy
 
-# # import resource
-# # soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-# # resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
+trainer = L.Trainer(
+                    accelerator="gpu",
+                    devices=2,
+                    precision="32-true", #"bf16-mixed","32-true" is the default.
+                    #strategy="ddp_notebook",
+                    strategy="ddp_find_unused_parameters_true",#DDPStrategy(static_graph=True)
+                    max_epochs=max_epoch,
+                    logger=tb_logger,
+                    #num_sanity_val_steps=2, #to use only if you know the trainer is working !
+                    callbacks=[checkpoint_callback],
+                    #enable_checkpointing=False,
+                    enable_progress_bar=True,
+                    log_every_n_steps=1,
+                    deterministic=True
+                    #profiler="simple"
+                    )
 
-# # trainer.fit(lit_model, train_dataloaders=[DataLoader(dataset_fold[fold]["train"], batch_size=batch_size,
-# #                                                      num_workers=1, persistent_workers=True,
-# #                                                      shuffle=True, drop_last=True),
-# #                                           DataLoader(dataset_fold_ref[fold]["train"], batch_size=batch_size,
-# #                                                      num_workers=1, persistent_workers=True,
-# #                                                      shuffle=True, drop_last=True)])
+import resource
+soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
 
+trainer.fit(lit_model, train_dataloaders=[DataLoader(dataset_fold[fold]["train"], batch_size=batch_size,
+                                                     num_workers=1, persistent_workers=True,
+                                                     shuffle=True, drop_last=True),
+                                          DataLoader(dataset_fold_ref[fold]["train"], batch_size=batch_size,
+                                                     num_workers=1, persistent_workers=True,
+                                                     shuffle=True, drop_last=True)])
 
 
 # """Generate fake image for each style transfer"""

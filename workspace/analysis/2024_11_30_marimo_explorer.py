@@ -20,7 +20,7 @@ def __():
     import polars as pl
 
     # df = pl.read_parquet("/datastore/shared/attribution/data/main_data.parquet")
-    df = pl.read_parquet("/home/hhakem/projects/counterfactuals_projects/workspace/analysis/image_active_crop_dataset/embedding_UMAP3.parquet")
+    df = pl.read_parquet("/home/hhakem/projects/counterfactuals_projects/workspace/analysis/image_active_crop_dataset/embedding_UMAP3.parquet")#embedding_UMAP3.parquet")
     df = df.with_columns(pl.when(pl.col("pred") == pl.col("moa_id")).then(pl.lit(1)).otherwise(pl.lit(0)).alias("correct"))
     return Path, df, pl
 
@@ -33,13 +33,13 @@ def __(Path):
     import numpy as np
 
     @cache
-    def load_image(image_id: int, channel: int):
+    def load_image(image_id: int, channel: int, img_key:str):
         zarr_path = Path("/home/hhakem/projects/counterfactuals_projects/workspace/analysis/image_active_crop_dataset/imgs_labels_groups.zarr")
         imgs = zarr.open(zarr_path)
-        return imgs["imgs"].oindex[image_id, channel]
+        return imgs[img_key].oindex[image_id, channel]
 
-    def load_image_channel(image_id: int, channel: tuple(int)):
-        return np.stack([load_image(image_id, ch) for ch in channel], axis=-3)
+    def load_image_channel(image_id: int, channel: tuple(int), img_key: str):
+        return np.stack([load_image(image_id, ch, img_key) for ch in channel], axis=-3)
     return cache, load_image, load_image_channel, np, zarr
 
 
@@ -173,6 +173,7 @@ def __(
     chart,
     df,
     get_metadata,
+    img_selector,
     indices_to_channel,
     load_image_channel,
     np,
@@ -183,7 +184,7 @@ def __(
     def compute_pixel_distribution():
         # load images
         channel_id_selected = list(range(5))
-        raw_images = np.stack([load_image_channel(x, tuple(channel_id_selected)) for x in list(chart.value["img_id"])], axis=0)
+        raw_images = np.stack([load_image_channel(x, tuple(channel_id_selected), img_selector.value) for x in list(chart.value["img_id"])], axis=0)
         pixels = raw_images.reshape(len(chart.value), 5, -1)
 
         # compute histogram
@@ -239,7 +240,7 @@ def __(
                       color=alt.Color(f"{metadata_L[0]}:N", title=f"{metadata_L[0]}"),
                   ).properties(
                       title='Histogram'))
-     
+
 
         return ax
     return compute_pixel_distribution, operator
@@ -326,6 +327,12 @@ def __(np):
 
 
 @app.cell
+def __(mo):
+    img_selector = mo.ui.dropdown(options=["imgs", "imgs_contrast"], value="imgs_contrast", allow_select_none=False)
+    return (img_selector,)
+
+
+@app.cell
 def __(chart, mo):
     table = mo.ui.table(chart.value)
     return (table,)
@@ -339,6 +346,7 @@ def __(
     chart,
     clip_outliers,
     get_channel,
+    img_selector,
     load_image_channel,
     low_high_clip,
     max_images_,
@@ -382,7 +390,7 @@ def __(
         selected_channel_indices = [channel_to_indices[ch] for ch in selected_channel]
 
         # Load the images and process them
-        raw_images = np.stack([load_image_channel(x, tuple(selected_channel_indices)) for x in indices], axis=0)
+        raw_images = np.stack([load_image_channel(x, tuple(selected_channel_indices), img_selector.value) for x in indices], axis=0)
 
         if clip_outliers.value:
             images = channel_to_rgb(clip_outliers_(raw_images), selected_channel)
@@ -414,6 +422,9 @@ def __(
         (
         f"""
         **Here's a preview of the images you've selected**:
+
+        **Image type:**
+        {img_selector}
 
         **Max Image:**
         {max_images_}
