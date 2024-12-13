@@ -1,0 +1,155 @@
+#+startup: beamer
+#+Title: Exploring gene function and morphology using JUMP Cell Painting Consortium data: The JUMP toolkit
+#+AUTHOR: $AUTHOR
+#+OPTIONS: toc:nil num:nil date:nil tex:t title:nil author:t email:nil ^:nil
+#+LATEX_CLASS: beamerposter
+#+BEAMER_THEME: gemini
+#+BEAMER_COLOR_THEME: gemini
+#+LATEX_HEADER: \usepackage{svg}
+#+BEAMER_HEADER: \definecolor{links}{HTML}{2A1B81}
+#+BEAMER_HEADER: \hypersetup{colorlinks,linkcolor=,urlcolor=links, citecolor=black}
+
+#+bibliography: local-bib.bib
+#+cite_export: csl
+
+* Footer (Optional)                                                  :ignore:
+#+BEAMER_HEADER: \footercontent{
+#+BEAMER_HEADER:  \href{https://github.com/USER/PROJECT/poster.pdf}{https://github.com/USER/PROJECT/poster.pdf} \hfill
+#+BEAMER_HEADER:  Broad Retreat 2024, Boston, US \hfill
+#+BEAMER_HEADER:  \href{mailto:hhakem@broadinstitute.org}{hhakem@broadinstitute.org}}
+# (can be left out to remove footer)
+
+* Logo (Optional)                                                    :ignore:
+# use this to include logos on the left and/or right side of the header:
+
+# #+BEAMER_HEADER: \logoleft{\includegraphics[height=12cm]{figs/qr_hub.png}} # Outcommented
+#+BEAMER_HEADER: \logoright{\includegraphics[height=3cm]{logos/broad_logo.png}}
+
+# # # ====================
+# # # Body
+# # # ====================
+
+* @@latex:@@ :B_fullframe:
+:PROPERTIES:
+:BEAMER_ENV: fullframe
+:END:
+
+** @@latex:@@ :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.3
+:END:
+*** Abstract
+With the Cell Painting assay we quantify cell morphology using six dyes to stain eight cellular components: Nucleus, mitochondria, endoplasmic reticulum, nucleoli, cytoplasmic RNA, actin, golgi aparatus, and plasma membrane. After high-throughput fluorescence microscopy, image analysis algorithms then extract thousands of morphological features from each single cell’s image. By comparing of these “profiles” we can can uncover new relationships among genetic and chemical perturbations.
+
+The JUMP-CP Consortium (Joint Undertaking for Morphological Profiling-Cell Painting) released the first public high-throughput dataset with over 140,000 genetic and chemical perturbations [cite:@chandrasekaranJUMPCellPainting2023].
+
+Here, we describe how this data can now be used to answer many biological questions. Researchers can pick any gene of interest and find what morphological phenotypes are induced when it is knocked-out or overexpressed and what genes produce a similar morphological profile when altered, uncovering functional relationships. Novel software tools developed for this dataset empower biologists to make discoveries of their own, and we show that mining this dataset can yield novel insights into current and relevant biological questions.
+\vspace*{2cm}
+*** Goals
+:PROPERTIES:
+:BEAMER_env: exampleblock
+:END:
+
+\heading{Device methods to interpret profile-based datasets to yield useful biological insight.}
+\heading{Develop a tool/workflow for biologists and computer scientists to discover genes that result in phenotypes similar to theirs.}
+\heading{Build a stepping stone for a universal and accessible framework against which biologists can validate cell phenotypes.}
+
+*** We use data from the Cell Painting assay, in which cellular components are stained using six dyes and imaged in five channels
+#+ATTR_LATEX: :width 1\textwidth
+[[file:figs/cellpainting.png]]
+\vspace*{2cm}
+
+*** Morphological profiles were generated at a high-throughput scale
+We generated and preprocessed a database composed of thousands of cell painting experiments.
+#+ATTR_LATEX: :width 1\textwidth
+[[file:figs/cell_painting_overview.png]]
+\vspace*{2cm}
+
+*** Online version of this poster
+#+ATTR_LATEX: :width 0.4\textwidth
+[[file:figs/qr_poster.png]]
+
+** @@latex:@@ :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.3
+:END:
+
+*** We generated a reference dataset for cells and features that indicates clustered groups of genes
+After applying batch correction, it becomes possible to query individual genes and find similar profiles. Precomputed distances for morphological profiles are made available.
+
+*** The JUMP consortium produced a massive set of morphological profiles
+#+ATTR_LATEX: :width 0.8\textwidth
+[[file:figs/clustermap_cells_features.png]]
+*** We pre-calculated correlations between perturbations
+#+ATTR_LATEX: :width 0.8\textwidth
+[[file:figs/clustermap_correlation.png]]
+
+
+A gallery to fetch all the available images for a given perturbation.
+[[file:figs/gallery.png]]
+
+*** Which other perturbations produce a phenotype similar to my gene of interest?
+We developed an ecosystem tools for scientist to find the perturbations most similar to theirs. 
+[[file:figs/web_interface.png]]
+
+** @@latex:@@ :BMCOL:
+:PROPERTIES:
+:BEAMER_col: 0.3
+:END:
+*** Which features are the most significant for my gene of interest?
+Statistical values of all features for a given perturbation.
+[[file:figs/features.png]]
+
+*** A standard analysis workflow has the following steps:
+1. Find the most correlated and anticorrelated genes.
+2. Find the features that show highest variance between these correlated/anticorrelated candidates.
+3. Use these feature to guide comparisons between perturbed cells and negative controls.
+4. Fetch images for these perturbations for inspection
+5. Retrieve additional annotations from existing databases.
+   
+*** We provide libraries for data scientists and developers
+:PROPERTIES:
+:BEAMER_env: block
+:END:
+We compare images using tools that decompose the channels to focus on the most important features obtained from data mining
+
+- [[https://github.com/broadinstitute/monorepo/tree/main/libs/jump_babel][broad_babel]]: Find the basic metadata for all perturbations
+- [[https://github.com/broadinstitute/monorepo/tree/main/libs/jump_portrait][jump_portrait]]: Fetch images using perturbation identifiers.
+- [[https://github.com/afermg/cp_measure][cp_measure]]: is a new and experimental tool to extract CellProfiler features directly from images.
+ 
+Examples of these tools and other workflows are available on the JUMP Hub.
+
+[[file:figs/jump_hub_images.png]]
+
+
+*** Available resources
+:PROPERTIES:
+:BEAMER_env: block
+:END:
+
+| Dataset       | ORF                  | CRISPR                  |
+|---------------+----------------------+-------------------------|
+| Description   | Gene overexpression  | Gene knock-out          |
+|---------------+----------------------+-------------------------|
+| Genes ranking | [[https://broad.io/orf][broad.io/orf]]         | [[https://broad.io/crispr][broad.io/crispr]]         |
+| Features      | [[https://broad.io/orf_feature][broad.io/orf_feature]] | [[https://broad.io/crispr_feature][broad.io/crispr_feature]] |
+| Gallery       | [[https://broad.io/orf_gallery][broad.io/orf_gallery]] | [[https://broad.io/crispr_gallery][broad.io/crispr_gallery]] |
+
+
+*** Conclusions :B_exampleblock:
+:PROPERTIES:
+:BEAMER_env: alertblock
+:END:
+All data and tools for programatic and manual access to the data are made available so people can explore and train models [cite:@chandrasekaranImagebasedProfilingDrug2021]. Refer to [[http://broad.io/jump][broad.io/jump]] for more information.
+
+\heading{The JUMP Cell Painting can serve as a resource to obtain candidate genes to find further insight on genes or proteins of interest.}
+\heading{Our querying systems can help both biologists and data scientists to accelerate their biological discoveries by providing means to interpret features and listing genes with similar phenotypes}
+
+
+*** References
+:PROPERTIES:
+:BEAMER_env: block
+:END:
+
+# Reminder: You can export these as local-bib.bib using (citar-export-local-bib-file)
+#+print_bibliography:

@@ -1,0 +1,198 @@
+#+TITLE: Reproducible poster generation
+#+AUTHOR: Alán F. Muñoz
+
+* Quick Instructions
+Provided you have nix this should be all you need.
+#+begin_src shell
+nix-shell --run make
+#+end_src
+
+* Introduction
+
+A repository for reproducible poster generation. It uses nix for dependency management and to be self-contained.
+
+* Dependencies
+- Emacs28+
+- TexLive
+
+* Project publish function
+
+This section is used to publish the documentation to =html= and =pdf= in the
+=pub/= directory.
+
+This code defines the =publish-html-cv= and =publish-pdf-cv= which are used to
+publish the CV into =html= and =pdf=, respectively.
+
+** PDF export
+*** LaTeX style
+
+**** =org= preamble
+:PROPERTIES:
+:HEADER-ARGS: :tangle org-preamble.sty
+:END:
+
+This section defines =org= preamble and settings for documents exported from
+=.org= to =.tex= files. The basic use is to add =\usepackage{org-preamble}= in
+your LaTeX document.
+
+***** Packages requirements
+
+****** AMS packages
+#+BEGIN_SRC latex
+  %% \RequirePackage{amsmath,amssymb}
+#+END_SRC
+
+****** hyperref package
+#+BEGIN_SRC latex
+  \RequirePackage{hyperref}
+#+END_SRC
+
+**** CV style
+:PROPERTIES:
+:HEADER-ARGS: :tangle cv-style.sty
+:END:
+
+***** Colors
+#+BEGIN_SRC latex
+  \definecolor{red}{RGB}{221,42,43}
+  \definecolor{green}{RGB}{105,182,40}
+  \definecolor{blue}{RGB}{0,51,153}
+  \definecolor{gray}{RGB}{25,25,25}
+  %\definecolor{red}{HTML}{D43F3F}
+  %\definecolor{blue}{HTML}{00ACE9}
+  %\definecolor{green}{HTML}{6A9A1F}
+  \colorlet{theMainColor}{blue}
+  \colorlet{theRefColor}{blue!90}
+  \newcommand{\globalcolor}[1]{%
+
+    \color{#1}\global\let\default@color\current@color
+  }
+#+END_SRC
+
+#+RESULTS:
+#+begin_export latex
+\definecolor{red}{RGB}{221,42,43}
+  \definecolor{green}{RGB}{105,182,40}
+  \definecolor{blue}{RGB}{0,51,153}
+  \definecolor{gray}{RGB}{25,25,25}
+  \colorlet{theMainColor}{blue}
+  \colorlet{theRefColor}{blue!90}
+  \newcommand{\globalcolor}[1]{%
+    \color{#1}\global\let\default@color\current@color
+  }
+#+end_export
+
+*** =org= to LaTeX stuff
+**** Use smart quote when exporting
+#+BEGIN_SRC emacs-lisp
+  (setq org-export-with-smart-quotes t)
+#+END_SRC
+
+#+RESULTS:
+: t
+
+**** Keep LaTeX logfiles
+#+BEGIN_SRC emacs-lisp
+  (setq org-latex-remove-logfiles nil)
+#+END_SRC
+
+#+RESULTS:
+
+**** Default list of LaTeX packages
+Only include one default package and remove all the crapppy stuff included by
+=org= \rightarrow =latex= translation.
+
+#+BEGIN_SRC emacs-lisp
+  (add-to-list 'org-latex-packages-alist '("" "org-preamble"))
+#+END_SRC
+
+#+RESULTS:
+|   | org-preamble |
+
+**** =org= LaTeX class
+#+BEGIN_SRC emacs-lisp
+  (unless (boundp 'org-latex-classes)
+    (setq org-latex-classes nil))
+
+   (add-to-list 'org-latex-classes
+         '("beamerposter"
+           "\\documentclass[final]{beamer}
+           \\usepackage[T1]{fontenc}
+           \\usepackage{lmodern}
+           \\usepackage[size=custom,width=84.1,height=118.9,scale=1.0]{beamerposter}  
+           \\usepackage{graphicx}
+           \\usepackage{booktabs}
+           \\usepackage{tikz}
+           \\usepackage{pgfplots}
+           \\pgfplotsset{compat=1.18}
+           \\usepackage{anyfontsize}
+           [NO-DEFAULT-PACKAGES]"))
+#+END_SRC
+
+
+**** Set LaTeX command
+#+BEGIN_SRC emacs-lisp
+  (setq org-latex-pdf-process '("latexmk -xelatex -shell-escape -quiet %f"))
+#+END_SRC
+
+#+RESULTS:
+| latexmk -xelatex -shell-escape -quiet %f |
+
+**** Markup filter
+Remove the quote block
+#+BEGIN_SRC emacs-lisp
+  ;; (defun latex::cv-quote-filter (contents backend info)
+  ;;   (when (eq backend 'latex)
+  ;;     (replace-regexp-in-string "." "" contents)))
+  ;; (add-to-list 'org-export-filter-quote-block-functions
+  ;;              'latex::cv-quote-filter)
+#+END_SRC
+
+**** ox-extra
+Enables :ignore: tags for optional headlines, or headlines used as comments.
+#+begin_src elisp
+    (require 'ox-extra)
+    (ox-extras-activate '(ignore-headlines))
+#+end_src
+
+*** Project definition
+#+BEGIN_SRC emacs-lisp
+   (message "Load path is %s" load-path)
+   (require 'citeproc)
+  (message "Load path now is %s" load-path)
+
+
+     (setq this-directory (file-name-directory (or load-file-name buffer-file-name)))
+     (setq pub-directory (concat this-directory "pub/"))
+     (unless (boundp 'org-publish-project-alist)
+       (setq org-publish-project-alist nil))
+
+
+     (add-to-list
+      'org-publish-project-alist
+      `("publish-pdf"
+        :base-directory ,this-directory
+        :base-extension "org"
+        :publishing-directory ,(expand-file-name "pdf" pub-directory)
+        :publishing-function org-beamer-publish-to-pdf
+        :exclude ".*publish.*.org\\|README.org"
+        ;; :section-numbers 2
+        :with-toc        nil
+        :latex-class "beamerposter"
+        ;; :latex-header-extra ""
+        ))
+     
+   ;; (add-to-list 'load-path "~/.emacs.d/elpa")
+   ;; (package-initialize)
+   ;; (require 'citeproc)
+#+END_SRC
+
+* Exporter functions
+#+BEGIN_SRC emacs-lisp
+  (defun org-publish-pdf ()
+    (progn
+      (org-publish-project "publish-pdf" 'force)
+      (shell-command "mv ./latex.d pub/pdf/.; mv -f poster* *.sty ./pub/pdf/latex.d/.; mv ./pub/pdf/latex.d/poster*.org .")
+      ))
+#+END_SRC
+
