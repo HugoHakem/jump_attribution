@@ -1,0 +1,13 @@
+\definecolor{red}{RGB}{221,42,43}
+\definecolor{green}{RGB}{105,182,40}
+\definecolor{blue}{RGB}{0,51,153}
+\definecolor{gray}{RGB}{25,25,25}
+%\definecolor{red}{HTML}{D43F3F}
+%\definecolor{blue}{HTML}{00ACE9}
+%\definecolor{green}{HTML}{6A9A1F}
+\colorlet{theMainColor}{blue}
+\colorlet{theRefColor}{blue!90}
+\newcommand{\globalcolor}[1]{%
+
+  \color{#1}\global\let\default@color\current@color
+}

@@ -537,7 +537,7 @@ checkpoint_callback = ModelCheckpoint(dirpath=Path("lightning_checkpoint_log"),
                                       filename=f"StarGANv2_image_crop_active_fold_{fold}_"+"{epoch}-{step}", #-{train_acc_true:.2f}-{train_acc_fake:.2f}",
                                       #monitor="val_acc",
                                       #mode="max",
-                                      every_n_train_steps=50,
+                                      every_n_train_steps=100,
                                       enable_version_counter=True)
                                       #every_n_epochs=1)
 
