@@ -8,7 +8,7 @@ from umap import UMAP
 from sklearn.decomposition import PCA
 
 dir_path = Path("/home/hhakem/projects/counterfactuals_projects/workspace/analysis/image_active_crop_dataset")
-fname = "embedding_VGG_image_crop_active_groups_fold_1epoch=77-train_acc=0.86-val_acc=0.77.csv"
+fname = "embedding_VGG_image_crop_active_contrast_fold_0_epoch=58-train_acc=0.93-val_acc=0.85.csv"#"embedding_VGG_image_crop_active_fold_0_epoch=61-train_acc=0.95-val_acc=0.82.csv"
 # shared_working_dir = Path("/datastore/shared/attribution/data/")
 data = pl.read_csv(dir_path / fname)
 
@@ -35,4 +35,4 @@ new_data = pl.concat(
     ),
     how="horizontal")
 # new_data = pl.concat((metadata, data.select(pl.col("^column_[123]$")).rename(lambda x: f"PC{x[-1]}")), how="horizontal")
-new_data.write_parquet(dir_path / "embedding_UMAP2.parquet")
+new_data.write_parquet(dir_path / "embedding_UMAP_contrast.parquet") # "embedding_UMAP3.parquet")

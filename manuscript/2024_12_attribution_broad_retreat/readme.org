@@ -7,6 +7,8 @@ Provided you have nix this should be all you need.
 nix-shell --run make
 #+end_src
 
+#+RESULTS:
+
 * Introduction
 
 A repository for reproducible poster generation. It uses nix for dependency management and to be self-contained.
@@ -42,10 +44,18 @@ your LaTeX document.
   %% \RequirePackage{amsmath,amssymb}
 #+END_SRC
 
+#+RESULTS:
+: %% \RequirePackage{amsmath,amssymb}
+
 ****** hyperref package
 #+BEGIN_SRC latex
   \RequirePackage{hyperref}
 #+END_SRC
+
+#+RESULTS:
+#+begin_export latex
+\RequirePackage{hyperref}
+#+end_export
 
 **** CV style
 :PROPERTIES:
@@ -75,9 +85,13 @@ your LaTeX document.
   \definecolor{green}{RGB}{105,182,40}
   \definecolor{blue}{RGB}{0,51,153}
   \definecolor{gray}{RGB}{25,25,25}
+  %\definecolor{red}{HTML}{D43F3F}
+  %\definecolor{blue}{HTML}{00ACE9}
+  %\definecolor{green}{HTML}{6A9A1F}
   \colorlet{theMainColor}{blue}
   \colorlet{theRefColor}{blue!90}
   \newcommand{\globalcolor}[1]{%
+
     \color{#1}\global\let\default@color\current@color
   }
 #+end_export
@@ -119,7 +133,7 @@ Only include one default package and remove all the crapppy stuff included by
            "\\documentclass[final]{beamer}
            \\usepackage[T1]{fontenc}
            \\usepackage{lmodern}
-           \\usepackage[size=custom,width=84.1,height=118.9,scale=1.0]{beamerposter}  
+           \\usepackage[size=custom,width=121.12,height=91.4,scale=1.0]{beamerposter}
            \\usepackage{graphicx}
            \\usepackage{booktabs}
            \\usepackage{tikz}
@@ -128,6 +142,9 @@ Only include one default package and remove all the crapppy stuff included by
            \\usepackage{anyfontsize}
            [NO-DEFAULT-PACKAGES]"))
 #+END_SRC
+
+#+RESULTS:
+| beamerposter | \documentclass[final]{beamer} |
 
 
 **** Set LaTeX command
@@ -148,12 +165,16 @@ Remove the quote block
   ;;              'latex::cv-quote-filter)
 #+END_SRC
 
+#+RESULTS:
+
 **** ox-extra
 Enables :ignore: tags for optional headlines, or headlines used as comments.
 #+begin_src elisp
     (require 'ox-extra)
     (ox-extras-activate '(ignore-headlines))
 #+end_src
+
+#+RESULTS:
 
 *** Project definition
 #+BEGIN_SRC emacs-lisp
@@ -187,6 +208,9 @@ Enables :ignore: tags for optional headlines, or headlines used as comments.
    ;; (require 'citeproc)
 #+END_SRC
 
+#+RESULTS:
+| publish-pdf | :base-directory | /home/hhakem/projects/counterfactuals_projects/manuscript/2024_12_attribution_broad_retreat/ | :base-extension | org | :publishing-directory | /home/hhakem/projects/counterfactuals_projects/manuscript/2024_12_attribution_broad_retreat/pub/pdf | :publishing-function | org-beamer-publish-to-pdf | :exclude | .*publish.*.org\ | README.org | :with-toc | nil | :latex-class | beamerposter |
+
 * Exporter functions
 #+BEGIN_SRC emacs-lisp
   (defun org-publish-pdf ()
@@ -196,3 +220,5 @@ Enables :ignore: tags for optional headlines, or headlines used as comments.
       ))
 #+END_SRC
 
+#+RESULTS:
+: org-publish-pdf
