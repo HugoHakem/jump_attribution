@@ -22,4 +22,4 @@ pub/pdf/%.pdf: %.org
 
 clean:
 	@rm -f *.elc *.aux *.tex *.pdf *~ *.sty
-	@rm -rf pub
+#	@rm -rf pub

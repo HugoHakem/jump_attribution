@@ -45,7 +45,9 @@ your LaTeX document.
 #+END_SRC
 
 #+RESULTS:
-: %% \RequirePackage{amsmath,amssymb}
+#+begin_export latex
+%% \RequirePackage{amsmath,amssymb}
+#+end_export
 
 ****** hyperref package
 #+BEGIN_SRC latex

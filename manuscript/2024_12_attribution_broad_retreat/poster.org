@@ -1,25 +1,26 @@
 #+startup: beamer
-#+Title: Exploring gene function and morphology using JUMP Cell Painting Consortium data: The JUMP toolkit
+#+Title: Phenotypic interpretability in Cell Painting assays using Deep Learning.
 #+AUTHOR: Hugo Hakem, Alán F. Muñoz, Shantanu Singh and Anne E. Carpenter
 #+OPTIONS: toc:nil num:nil date:nil tex:t title:nil author:t email:nil ^:nil
 #+LATEX_CLASS: beamerposter
 #+BEAMER_THEME: gemini
 #+BEAMER_COLOR_THEME: gemini
 #+LATEX_HEADER: \usepackage{svg}
-#+BEAMER_HEADER: \definecolor{links}{HTML}{2A1B81}
+#+Beamer_HEADER: \definecolor{links}{HTML}{2A1B81}
 #+BEAMER_HEADER: \hypersetup{colorlinks,linkcolor=,urlcolor=links, citecolor=black}
 
 #+bibliography: local-bib.bib
 #+cite_export: csl
 
 * Footer (Optional)                                                  :ignore:
-# #+BEAMER_HEADER: \footercontent{
-# #+BEAMER_HEADER:  \href{https://github.com/USER/PROJECT/poster.pdf}{https://github.com/USER/PROJECT/poster.pdf} \hfill
-# #+BEAMER_HEADER:  Broad Retreat 2024, Boston, US \hfill
-# #+BEAMER_HEADER:  \href{mailto:hhakem@broadinstitute.org}{hhakem@broadinstitute.org}}
-# # (can be left out to remove footer)
+#+BEAMER_HEADER: \footercontent{
+#+BEAMER_HEADER: \href{https://github.com/USER/PROJECT/poster.pdf}{https://github.com/USER/PROJECT/poster.pdf} \hfill
+#+BEAMER_HEADER: Broad Retreat 2024, Boston, US \hfill
+#+BEAMER_HEADER: \href{mailto:hhakem@broadinstitute.org}{hhakem@broadinstitute.org}}
+# (can be left out to remove footer)
 
-* Logo (Optional)                                                    :ignore:
+
+* Logo (Optional) :ignore:
 # use this to include logos on the left and/or right side of the header:
 
 # #+BEAMER_HEADER: \logoleft{\includegraphics [height=12cm]{figs/qr_hub.png}} # Outcommented
@@ -39,30 +40,41 @@
 :BEAMER_col: 0.3
 :END:
 *** Abstract
-With the Cell Painting assay we quantify cell morphology using six dyes to stain eight cellular components: Nucleus, mitochondria, endoplasmic reticulum, nucleoli, cytoplasmic RNA, actin, golgi aparatus, and plasma membrane. After high-throughput fluorescence microscopy, image analysis algorithms then extract thousands of morphological features from each single cell’s image. By comparing of these “pro files” we can can uncover new relationships among genetic and chemical perturbations.
+Chemically perturbed cells show a diverse array of phenotypes in Cell Painting assays. This phenotypic variety poses a big challenge when trying to obtain biological understanding in spite of the classification accuracy of modern machine and deep learning models. We propose a framework that can help elucidate complex cell morphologies using artificially-generated images and attribution methods. Using a StarGANv2 neural network to perform image-to-image style translation, we generate what cells would look like if perturbed by a different chemical - counterfactual images. We then use attribution techniques on a classifier to pinpoint areas of importance to the prediction when comparing real images to their counterfactual. This approach enables linking the change in prediction probabilities of a classifier to regions in images. It will enable the extraction of novel biological insight from large scale datasets, such as JUMP Cell-Painting..
 
+*** Motivation
+Cell Painting is an image-based microscopy profiling assay that permits disease phenotype identification at a low cost using high-throughput screening [cite:@chandrasekaranJUMPCellPainting2023]. However, feature extraction algorithms used for analysis often involve a multitude of processing steps. This undermines feature interpretability relative to cell morphological characteristics. Our framework bridges the gap by directly locating on cell images key morphological features relevant to their perturbation.
 
-Here, we describe how this data can now be used to answer many biological questions. Researchers can pick any gene of interest and find what morphological phenotypes are induced when it is knocked-out or overexpressed and what genes produce a similar morphological pro file when altered, uncovering functional relationships. Novel software tools developed for this dataset empower biologists to make discoveries of their own, and we show that mining this dataset can yield novel insights into current and relevant biological questions.
 \vspace*{2cm}
-*** Goals
+*** Framework Key Ideas
 :PROPERTIES:
 :BEAMER_env: exampleblock
 :END:
 
-\heading{Device methods to interpret pro file-based datasets to yield useful biological insight.}
-\heading{Develop a tool/workflow for biologists and computer scientists to discover genes that result in phenotypes similar to theirs.}
-\heading{Build a stepping stone for a universal and accessible framework against which biologists can validate cell phenotypes.}
+\heading{Counterfactual reasoning empowers interpretability in morphological data}
+Cell to cell variability and technical factors make it challenging to compare the effects of different perturbations across unrelated images [cite:@lamiableRevealingInvisibleCell2023]. We address this by leveraging deep learning-based generative models to create counterfactual images -- visualization of how would cell appear under a different perturbationg. Resultant images share consistent conditions with the original (e.g., position, environment, lighting) yet display morphological features relative to distinct perturbation.
+
+\heading{Deep learning classifiers accurately distinguish perturbations}
+We train a classifier to recognise the perturbation applied to real images.
+
+\heading{Attribution techniques reveals features important for classifier predictions}
+Attribution techniques can compare layer activation of the classifier between two images, assigning importance scores to input pixels to highlight critical area that differentiate them [cite:@ecksteinDiscriminativeAttributionCounterfactuals2021].
+Using this approach, we retrieve a minimal mask of the most important pixel that leads to a classification switch between real and counterfactual images.
 
 *** We use data from the Cell Painting assay, in which cellular components are stained using six dyes and imaged in five channels
-#+ATTR_LATEX: :width 1\textwidth
-[[../../workspace/analysis/figures/mask_size_dac.png]]
-\vspace*{2cm}
+# #+ATTR_LATEX: :width 1\textwidth
+# [[../../workspace/analysis/figures/mask_size_dac.png]]
 
+
+
+# #+ATTR_LATEX: :width 1\textwidth
+# [[file:~/projects/counterfactuals_projects/workspace/analysis/figures/moa_id_to_pert.png]]
+\vspace*{2cm}
 *** Morphological pro files were generated at a high-throughput scale
 We generated and preprocessed a database composed of thousands of cell painting experiments.
 #+ATTR_LATEX: :width 1\textwidth
 \vspace*{2cm}
-
+test textchange
 
 ** @@latex:@@ :BMCOL:
 :PROPERTIES:
@@ -103,22 +115,26 @@ Statistical values of all features for a given perturbation.
 :END:
 We compare images using tools that decompose the channels to focus on the most important features obtained from data mining
 
-EXAMPLE OF A CITATION
 
 *** Available resources
 :PROPERTIES:
 :BEAMER_env: block
 :END:
 
-test block
-*** Conclusions :B_exampleblock:
+*** Future work :B_exampleblock:
 :PROPERTIES:
 :BEAMER_env: alertblock
 :END:
 
-\heading{The JUMP Cell Painting can serve as a resource to obtain candidate genes to find further insight on genes or proteins of interest.}
-\heading{Our querying systems can help both biologists and data scientists to accelerate their biological discoveries by providing means to interpret features and listing genes with similar phenotypes}
-[cite:@augustinDiffusionVisualCounterfactual2022]
+\heading{Build an interactive interface for efficient visualization and mask interpretation}
+Use marimo interactive notebook to display real images with their associated counterfactual and increasing mask.
+
+\heading{Mask consistency across classifier and generative architecture}
+Mask retrieval is dependent on the attribution method, the classifier architecture and the counterfactual quality. Our framework tested various attribution method but it remain to be studied the effect of classifier and generative architecture.
+
+\heading{Mask differentiation across channel}
+Here saliency map has been aggregated across channels for the sake of simplicity but differentiating across channel could allow more granularity.
+
 *** References
 :PROPERTIES:
 :BEAMER_env: block
