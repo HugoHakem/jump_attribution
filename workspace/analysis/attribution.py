@@ -1,48 +1,37 @@
 #!/usr/bin/env python
 # coding: utf-8
+import time
+import warnings
 from functools import partial, reduce
 from itertools import starmap
-
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-import time
-
+from multiprocessing import Pool, cpu_count
+from multiprocessing.pool import ThreadPool
 from pathlib import Path
-import warnings
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 import cv2
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import polars as pl
+import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms.functional as F_vis
-from captum._utils.common import (
-    _format_additional_forward_args,
-    _format_output,
-    _format_tensor_into_tuples,
-    _is_tuple,
-)
+from captum._utils.common import (_format_additional_forward_args,
+                                  _format_output, _format_tensor_into_tuples,
+                                  _is_tuple)
 from captum._utils.gradient import compute_layer_gradients_and_eval
-from captum._utils.typing import BaselineType, TargetType, TensorOrTupleOfTensorsGeneric
-from captum.attr import (
-    DeepLift,
-    GuidedBackprop,
-    IntegratedGradients,
-    LayerActivation,
-    LayerGradCam,
-    Saliency,
-)
-from captum.attr._utils.common import (
-    _format_input_baseline,
-)
+from captum._utils.typing import (BaselineType, TargetType,
+                                  TensorOrTupleOfTensorsGeneric)
+from captum.attr import (DeepLift, GuidedBackprop, IntegratedGradients,
+                         LayerActivation, LayerGradCam, Saliency)
+from captum.attr._utils.common import _format_input_baseline
 from torch import Tensor
-
-from multiprocessing import Pool, cpu_count
-from multiprocessing.pool import ThreadPool
-
-import pandas as pd
-import polars as pl
-import seaborn as sns
 from tqdm import tqdm
+
 torch.manual_seed(42)
 np.random.seed(42)
 
@@ -813,11 +802,55 @@ def normalize_attribution(attribution: torch.Tensor, percentile: Union[int, floa
 ------- Visualization of attribution function ----------
 """
 
+def channel_to_rgb(img_array: np.ndarray,
+                   channel: list[str]|None=None,
+                   channel_last: bool=True):
+
+
+    if img_array.ndim not in {3, 4}:
+        raise Exception(
+            f"input array should have shape (sample, C, H, W) or (C, H, W).\n"
+            f"Here input shape: {img_array.shape}")
+    if img_array.shape[-3] > len(channel):
+        raise Exception(f"input array should have shape (sample, C, H, W) or (C, H, W) with C <= 5.\n"
+                        f"Here input shape: {img_array.shape}\n"
+                        f"And C: {img_array.shape[-3]}")
+    if channel is None:
+        # if no channel provided, assume no transformation required.
+        img_array_rgb = img_array
+        if channel_last:
+            img_array_rgb = np.moveaxis(img_array_rgb, -3, -1)
+        return img_array_rgb.clip(0, 1) # to ensure correct window value
+
+    map_channel_color = {
+        "AGP": "#FF7F00", #"#FFA500", # Orange
+        "DNA": "#0000FF", # Blue
+        "ER": "#00FF00", #"#65fe08" # Green
+        "Mito": "#FF0000", # Red
+        "RNA": "#FFFF00" # Yellow
+        }
+
+    channel_rgb_weight = np.vstack(list(map(lambda ch: list(mcolors.to_rgb(map_channel_color[ch])), channel)))
+    img_array_rgb = np.tensordot(img_array, channel_rgb_weight, axes=[[-3], [0]])
+    # tensordot give img in (sample, H, W, C) or (H, W, C)
+    # we normalize and rotate for the sake of consistency with input
+    norm_rgb = np.maximum(channel_rgb_weight.sum(axis=0), np.ones(3))
+    img_array_rgb = img_array_rgb / norm_rgb
+    if not channel_last:
+        img_array_rgb = np.moveaxis(img_array_rgb, -1, -3)
+    return img_array_rgb.clip(0, 1) # to ensure correct window value
+
+
 def visualize_attribution(attributions, X_real, X_fake, y_real, y_fake, y_hat_real, y_hat_fake,  method_names=None,
-                          fig=None, axes=None):
+                          fig=None, axes=None, channel: list[str]|None=None):
     # Ensure X_real and X_fake are in channel-last format for plotting
-    X_real = np.transpose(X_real, (1, 2, 0))
-    X_fake = np.transpose(X_fake, (1, 2, 0))
+
+    X_real = channel_to_rgb(X_real,
+                            channel,
+                            channel_last=True)
+    X_fake = channel_to_rgb(X_fake,
+                            channel,
+                            channel_last=True)
 
     num_methods = len(attributions)  # Number of attribution methods
     if fig is None or axes is None:
@@ -850,10 +883,14 @@ def visualize_attribution(attributions, X_real, X_fake, y_real, y_fake, y_hat_re
 def visualize_attribution_mask(attributions, mask_weight, mask_size,
                                X_real, X_fake, y_real, y_fake, y_hat_real, y_hat_fake,
                                method_names=None,
-                               fig=None, axes=None):
+                               fig=None, axes=None, channel: list[str]|None=None):
     # Ensure X_real and X_fake are in channel-last format for plotting
-    X_real = np.transpose(X_real, (1, 2, 0))
-    X_fake = np.transpose(X_fake, (1, 2, 0))
+    X_real = channel_to_rgb(X_real,
+                            channel,
+                            channel_last=True)
+    X_fake = channel_to_rgb(X_fake,
+                            channel,
+                            channel_last=True)
 
     num_methods = len(attributions)  # Number of attribution methods
     num_mask = mask_size.shape[-1]
@@ -895,10 +932,14 @@ def visualize_attribution_min_mask(attributions, mask_weights, mask_sizes,
                                    X_real, X_fake, y_real, y_fake, y_hat_real, y_hat_fake,
                                    method_names=None,
                                    real_baseline=True,
-                                   fig=None, axes=None):
+                                   fig=None, axes=None, channel: list[str]|None=None):
     # Ensure X_real and X_fake are in channel-last format for plotting
-    X_real = np.transpose(X_real, (1, 2, 0))
-    X_fake = np.transpose(X_fake, (1, 2, 0))
+    X_real = channel_to_rgb(X_real,
+                            channel,
+                            channel_last=True)
+    X_fake = channel_to_rgb(X_fake,
+                            channel,
+                            channel_last=True)
 
     num_methods = len(attributions)  # Number of attribution methods
     if fig is None or axes is None:
@@ -955,10 +996,15 @@ def visualize_attribution_smallest_mask(attribution, mask_weight, mask_size,
                                         X_real, X_fake, y_real, y_fake, y_hat_real, y_hat_fake,
                                         method_name=None,
                                         real_baseline=True,
-                                        fig=None, axes=None):
+                                        fig=None, axes=None, channel: list[str]|None=None):
+
     # Ensure X_real and X_fake are in channel-last format for plotting
-    X_real = np.transpose(X_real, (1, 2, 0))
-    X_fake = np.transpose(X_fake, (1, 2, 0))
+    X_real = channel_to_rgb(X_real,
+                            channel,
+                            channel_last=True)
+    X_fake = channel_to_rgb(X_fake,
+                            channel,
+                            channel_last=True)
 
     if fig is None or axes is None:
         fig, axes = plt.subplots(1, 7, figsize=(5 * 7, 5))
@@ -1009,7 +1055,8 @@ def plot_attr_img(model, dataloader_real_fake, fig_name, fig_directory=Path("./f
                   percentile=98,
                   real_baseline=True,
                   method_kwargs_dict=None,
-                  attr_kwargs_dict=None):
+                  attr_kwargs_dict=None,
+                  channel: list[str]|None=None):
 
     method_kwargs_dict = build_kwargs_dict(attr_names=attr_names, kwargs_dict=method_kwargs_dict)
     attr_kwargs_dict = build_kwargs_dict(attr_names=attr_names, kwargs_dict=attr_kwargs_dict)
@@ -1043,10 +1090,11 @@ def plot_attr_img(model, dataloader_real_fake, fig_name, fig_directory=Path("./f
         attributions = np.stack(attributions, axis=1)
         for i in range(X_real.shape[0]):
             fig, _ = visualize_attribution(attributions[i],((1+X_real[i])/2).detach().cpu().numpy(), ((1+X_fake[i])/2).detach().cpu().numpy(),
-                                              y_real[i].detach().cpu().numpy(), y_fake[i].detach().cpu().numpy(),
-                                              y_hat_real[i].detach().cpu().numpy(), y_hat_fake[i].detach().cpu().numpy(),
-                                              attr_names,
-                                              fig, axis[curr_img, :])
+                                           y_real[i].detach().cpu().numpy(), y_fake[i].detach().cpu().numpy(),
+                                           y_hat_real[i].detach().cpu().numpy(), y_hat_fake[i].detach().cpu().numpy(),
+                                           attr_names,
+                                           fig, axis[curr_img, :],
+                                           channel=channel)
             curr_img += 1
             if curr_img == num_img:
                 break
@@ -1066,7 +1114,8 @@ def plot_attr_mask_img(model, dataloader_real_fake, fig_name, fig_directory=Path
                        percentile=98,
                        real_baseline=True,
                        method_kwargs_dict=None,
-                       attr_kwargs_dict=None):
+                       attr_kwargs_dict=None,
+                       channel: list[str]|None=None):
 
     method_kwargs_dict = build_kwargs_dict(attr_names=attr_names, kwargs_dict=method_kwargs_dict)
     attr_kwargs_dict = build_kwargs_dict(attr_names=attr_names, kwargs_dict=attr_kwargs_dict)
@@ -1123,7 +1172,8 @@ def plot_attr_mask_img(model, dataloader_real_fake, fig_name, fig_directory=Path
                                                 y_hat_real[i].detach().cpu().numpy(), y_hat_fake[i].detach().cpu().numpy(),
                                                 attr_names,
                                                 fig,
-                                                axis[num_y_ax_per_img * curr_img: num_y_ax_per_img * curr_img + num_y_ax_per_img,:])
+                                                axis[num_y_ax_per_img * curr_img: num_y_ax_per_img * curr_img + num_y_ax_per_img,:],
+                                                channel=channel)
             curr_img += 1
             if curr_img == num_img:
                 break
@@ -1145,7 +1195,8 @@ def plot_attr_min_mask_img(model, dataloader_real_fake, mask_dac_df, fig_name, f
                            percentile=98,
                            real_baseline=True,
                            method_kwargs_dict=None,
-                           attr_kwargs_dict=None):
+                           attr_kwargs_dict=None,
+                           channel: list[str]|None=None):
     """plot every saliency maps with their respective min mask and hybrid image"""
 
     id_min_mask_dict = compute_id_min_mask(mask_dac_df)
@@ -1229,7 +1280,8 @@ def plot_attr_min_mask_img(model, dataloader_real_fake, mask_dac_df, fig_name, f
                                                     attr_names,
                                                     real_baseline,
                                                     fig,
-                                                    axis[num_y_ax_per_img * curr_img: num_y_ax_per_img * curr_img + num_y_ax_per_img,:])
+                                                    axis[num_y_ax_per_img * curr_img: num_y_ax_per_img * curr_img + num_y_ax_per_img,:],
+                                                    channel=channel)
             curr_img += 1
             if curr_img == num_img:
                 break
@@ -1249,7 +1301,8 @@ def plot_smallest_mask_img(model, dataloader_real_fake, mask_dac_df, fig_name, f
                       percentile=98,
                       real_baseline=True,
                       method_kwargs_dict=None,
-                      attr_kwargs_dict=None):
+                      attr_kwargs_dict=None,
+                      channel: list[str]|None=None):
     """plot only the saliency maps with the smallest mask across min mask."""
 
     id_min_mask_dict = compute_id_min_mask(mask_dac_df)
@@ -1327,13 +1380,14 @@ def plot_smallest_mask_img(model, dataloader_real_fake, mask_dac_df, fig_name, f
 
         for i in range(X_real.shape[0]):
             fig, _ = visualize_attribution_smallest_mask(attributions[i], mask_weight_selected[i], mask_size_selected[i],
-                                                    ((1+X_real[i])/2).detach().cpu().numpy(), ((1+X_fake[i])/2).detach().cpu().numpy(),
-                                                    y_real[i].detach().cpu().numpy(), y_fake[i].detach().cpu().numpy(),
-                                                    y_hat_real[i].detach().cpu().numpy(), y_hat_fake[i].detach().cpu().numpy(),
-                                                    attr_names_selected[i],
-                                                    real_baseline,
-                                                    fig,
-                                                    axis[curr_img,:])
+                                                         ((1+X_real[i])/2).detach().cpu().numpy(), ((1+X_fake[i])/2).detach().cpu().numpy(),
+                                                         y_real[i].detach().cpu().numpy(), y_fake[i].detach().cpu().numpy(),
+                                                         y_hat_real[i].detach().cpu().numpy(), y_hat_fake[i].detach().cpu().numpy(),
+                                                         attr_names_selected[i],
+                                                         real_baseline,
+                                                         fig,
+                                                         axis[curr_img,:],
+                                                         channel=channel)
             curr_img += 1
             if curr_img == num_img:
                 break
@@ -1695,7 +1749,8 @@ def plot_dac_curve(mask_dac_df, accuracy_df, fig_name="mask_size_dac", fig_direc
     plt.close()
 
 
-def plot_dac_curve_per_transition(mask_dac_df, accuracy_df, real_baseline=True, fig_name="dac_curve_per_transition", fig_directory=Path("./figures"), compute_dac=True):
+def plot_dac_curve_per_transition(mask_dac_df, accuracy_df, real_baseline=True, fig_name="dac_curve_per_transition",
+                                  fig_directory=Path("./figures"), compute_dac=True):
     if real_baseline: # if the real baseline is used, then when mask=0 Xhybrid = Xc. and mask=1 Xhybrid = Xr
         mask_dac_class_df = (mask_dac_df
                        .with_columns(
@@ -1759,12 +1814,13 @@ def plot_dac_curve_per_transition(mask_dac_df, accuracy_df, real_baseline=True, 
 
 
 
-import conv_model
-import custom_dataset
 import torch.nn.functional as F
-from lightning_parallel_training import LightningModelV2
 from torch.utils.data import DataLoader
 from torchvision.transforms import v2
+
+import conv_model
+import custom_dataset
+from lightning_parallel_training import LightningModelV2
 
 fig_directory = Path("/home/hhakem/projects/counterfactuals_projects/workspace/analysis/figures")
 
@@ -1772,20 +1828,20 @@ fig_directory = Path("/home/hhakem/projects/counterfactuals_projects/workspace/a
 device = ("cuda" if torch.cuda.is_available() else "cpu")
 
 # define path for real and fake dataset
-batch_size = 8
+batch_size = 16
 fold = 0
 split = "test"
-mode = "lat"
+mode = "ref"
 use_ema = True
-fake_img_path_preffix = "image_active_dataset/fake_imgs"
+fake_img_path_preffix = "image_active_crop_dataset/fake_imgs"
 
 suffix = "_ema" if use_ema else ""
 sub_directory = Path(split) / f"fold_{fold}" / mode / "imgs_labels_groups.zarr"
 imgs_fake_path = Path(fake_img_path_preffix + suffix) / sub_directory
-imgs_real_path = Path("image_active_dataset/imgs_labels_groups.zarr")
+imgs_real_path = Path("image_active_crop_dataset/imgs_labels_groups.zarr")
 
 # select channel
-channel = ["AGP","DNA", "ER"]#, "Mito"]#, "RNA"]
+channel = ["AGP","DNA", "ER", "Mito", "RNA"]
 channel.sort()
 map_channel = {ch: i for i, ch in enumerate(["AGP", "DNA", "ER", "Mito", "RNA"])}
 id_channel = np.array([map_channel[ch] for ch in channel])
@@ -1793,7 +1849,7 @@ id_channel = np.array([map_channel[ch] for ch in channel])
 # create dataset_real_fake
 dataset_real_fake = custom_dataset.ImageDataset_real_fake(imgs_real_path, imgs_fake_path,
                                                           channel=id_channel,
-                                                          org_to_trg_label=None, #[(0, 1), (0, 2), (0, 3)],
+                                                          org_to_trg_label=None,#[(3, 1)],#, (3, 1), (3, 2)],
                                                           img_transform=v2.Compose([v2.Lambda(lambda img:
                                                                                                torch.tensor(img, dtype=torch.float32)),
                                                                                     v2.Normalize(mean=len(channel)*[0.5],
@@ -1803,7 +1859,7 @@ dataset_real_fake = custom_dataset.ImageDataset_real_fake(imgs_real_path, imgs_f
 dataloader_real_fake = DataLoader(dataset_real_fake, batch_size=batch_size, num_workers=1, persistent_workers=True)
 
 # load trained classifier
-VGG_path = "VGG_image_active_fold_0epoch=78-train_acc=0.96-val_acc=0.91.ckpt"
+VGG_path = "VGG_image_crop_active_fold_0_epoch=61-train_acc=0.95-val_acc=0.82.ckpt" #"VGG_image_active_fold_0epoch=78-train_acc=0.96-val_acc=0.91.ckpt"
 VGG_module = LightningModelV2.load_from_checkpoint(Path("lightning_checkpoint_log") / VGG_path,
                                                    model=conv_model.VGG_ch)
 VGG_model = VGG_module.model.eval().to(device)
@@ -1812,54 +1868,58 @@ VGG_model = VGG_module.model.eval().to(device)
 attr_methods = [D_InGrad, IntegratedGradients, DeepLift, D_GuidedGradCam, D_GradCam, Residual_attr, Random_attr]
 attr_names = ["D_InputXGrad", "IntegratedGradients", "DeepLift", "D_GuidedGradcam", "D_GradCam", "Residual", "Random"]
 real_baseline = True
-baseline_used = "real_baseline" if real_baseline else "fake_baseline"
+baseline_used = "_real_baseline" if real_baseline else "_fake_baseline"
 
 
 """Compute Saliency map for multiple attribution method"""
 
-# fig_name = "saliency_map" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
+# fig_name = "crop_3_1_saliency_map" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
 # plot_attr_img(VGG_model, dataloader_real_fake, fig_name=fig_name, fig_directory=fig_directory ,num_img=32,
 #               attr_methods=attr_methods, attr_names=attr_names,
-#               percentile=98, real_baseline=real_baseline)
+#               percentile=98, real_baseline=real_baseline,
+#               channel=channel)
 
-# fig_name = "mask_saliency_map" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
+# fig_name = "crop_3_1_mask_saliency_map" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
 # plot_attr_mask_img(VGG_model, dataloader_real_fake, fig_name=fig_name, fig_directory=fig_directory,
-#                    num_img=24, steps=200, head_tail=(1,5), shift=0.7, selected_mask=[0, 50, 100],
-#                    size_closing=10, size_gaussblur=11,
+#                    num_img=24, steps=200, head_tail=(1,5), shift=0.7, selected_mask=[10, 50, 100],
+#                    size_closing=10, size_gaussblur=11, #size_closing=10, size_gaussblur=11,
 #                    attr_methods=attr_methods, attr_names=attr_names,
-#                    percentile=98, real_baseline=real_baseline)
+#                    percentile=98, real_baseline=real_baseline,
+#                    channel=channel)
 
 """Compute DAC curve of multiple attribution method"""
 attr_methods = [D_InGrad, IntegratedGradients, DeepLift, D_GuidedGradCam, D_GradCam, Residual_attr, Random_attr][:]
 attr_names = ["D_InputXGrad", "IntegratedGradients", "DeepLift", "D_GuidedGradcam", "D_GradCam", "Residual", "Random"][:]
-mask_size_tot, dac_tot, pred_hybrid_tot, mat_count, mat_acc = dac_curve_computation(VGG_model, dataloader_real_fake,
-                                                                   attr_methods=attr_methods,
-                                                                   attr_names=attr_names,
-                                                                   batch_size_mask=512,
-                                                                   steps=200, shift=0.7, head_tail=(1, 5),
-                                                                   percentile=98,
-                                                                   size_closing=10,
-                                                                   size_gaussblur=11,
-                                                                   early_stop=None, #None,
-                                                                   real_baseline=real_baseline,
-                                                                   method_kwargs_dict=None, #{"D_GradCam": {"num_layer": -3}}
-                                                                   attr_kwargs_dict=None)
+mask_size_tot, dac_tot, pred_hybrid_tot, mat_count, mat_acc = dac_curve_computation(
+    VGG_model,
+    dataloader_real_fake,
+    attr_methods=attr_methods,
+    attr_names=attr_names,
+    batch_size_mask=512,
+    steps=100, shift=0.7, head_tail=(1, 5),
+    percentile=98,
+    size_closing=10,
+    size_gaussblur=11,
+    early_stop=None, #None,
+    real_baseline=real_baseline,
+    method_kwargs_dict=None, #{"D_GradCam": {"num_layer": -3}}
+    attr_kwargs_dict=None)
 
-file_name_mask_dac = "mask_dac_df_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".csv"
-file_name_acc = "accuracy_df_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".csv"
+file_name_mask_dac = "crop_mask_dac_df_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".csv"
+file_name_acc = "crop_accuracy_df_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".csv"
 mask_dac_df, accuracy_df = format_mask_dac_df(mask_size_tot, dac_tot, pred_hybrid_tot, mat_count, mat_acc, save_df=True, #WHETHER TO SAVE FILE
                                               file_name_mask_dac=file_name_mask_dac,
                                               file_name_acc=file_name_acc,
-                                              file_directory=Path("mask_dac_results"))
-# mask_dac_df, accuracy_df = pl.read_csv(Path("mask_dac_results") / file_name_mask_dac), pl.read_csv(Path("mask_dac_results") / file_name_acc)
+                                              file_directory=Path("crop_mask_dac_results"))
+# mask_dac_df, accuracy_df = pl.read_csv(Path("crop_mask_dac_results") / file_name_mask_dac), pl.read_csv(Path("crop_mask_dac_results") / file_name_acc)
 
-fig_name = "dac_curve_" + baseline_used +  f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
+fig_name = "crop_dac_curve_" + baseline_used +  f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
 plot_dac_curve(mask_dac_df, accuracy_df, fig_name=fig_name, fig_directory=fig_directory, compute_dac=True)
 
-fig_name = "dac_curve_per_transition_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
+fig_name = "crop_dac_curve_per_transition_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
 plot_dac_curve_per_transition(mask_dac_df, accuracy_df, fig_name=fig_name, fig_directory=fig_directory, compute_dac=True)
-#
-#
+
+
 """Plot min mask for multiple attribution method"""
 # fig_name = "min_mask_per_attr_" + baseline_used +  f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
 # plot_attr_min_mask_img(VGG_model, dataloader_real_fake, mask_dac_df,
@@ -1868,7 +1928,8 @@ plot_dac_curve_per_transition(mask_dac_df, accuracy_df, fig_name=fig_name, fig_d
 #                        size_closing=10, size_gaussblur=11,
 #                        attr_methods=attr_methods, attr_names=attr_names,
 #                        percentile=98,
-#                        real_baseline=real_baseline)
+#                        real_baseline=real_baseline,
+#                        channel=channel)
 
 
 # fig_name = "smallest_mask" + baseline_used +  f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
@@ -1878,33 +1939,34 @@ plot_dac_curve_per_transition(mask_dac_df, accuracy_df, fig_name=fig_name, fig_d
 #                        size_closing=10, size_gaussblur=11,
 #                        attr_methods=attr_methods, attr_names=attr_names,
 #                        percentile=98,
-#                        real_baseline=real_baseline)
+#                        real_baseline=real_baseline,
+#                        channel=channel)
 
-real_baseline = False
-baseline_used = "real_baseline" if real_baseline else "fake_baseline"
-attr_methods = [D_InGrad, IntegratedGradients, DeepLift, D_GuidedGradCam, D_GradCam, Residual_attr, Random_attr][:]
-attr_names = ["D_InputXGrad", "IntegratedGradients", "DeepLift", "D_GuidedGradcam", "D_GradCam", "Residual", "Random"][:]
-mask_size_tot, dac_tot, pred_hybrid_tot, mat_count, mat_acc = dac_curve_computation(VGG_model, dataloader_real_fake,
-                                                                   attr_methods=attr_methods,
-                                                                   attr_names=attr_names,
-                                                                   batch_size_mask=512,
-                                                                   steps=200, shift=0.7, head_tail=(1, 5),
-                                                                   percentile=98,
-                                                                   size_closing=10,
-                                                                   size_gaussblur=11,
-                                                                   early_stop=None, #None,
-                                                                   real_baseline=real_baseline,
-                                                                   method_kwargs_dict=None, #{"D_GradCam": {"num_layer": -3}}
-                                                                   attr_kwargs_dict=None)
+# real_baseline = False
+# baseline_used = "real_baseline" if real_baseline else "fake_baseline"
+# attr_methods = [D_InGrad, IntegratedGradients, DeepLift, D_GuidedGradCam, D_GradCam, Residual_attr, Random_attr][:]
+# attr_names = ["D_InputXGrad", "IntegratedGradients", "DeepLift", "D_GuidedGradcam", "D_GradCam", "Residual", "Random"][:]
+# mask_size_tot, dac_tot, pred_hybrid_tot, mat_count, mat_acc = dac_curve_computation(VGG_model, dataloader_real_fake,
+#                                                                    attr_methods=attr_methods,
+#                                                                    attr_names=attr_names,
+#                                                                    batch_size_mask=512,
+#                                                                    steps=200, shift=0.7, head_tail=(1, 5),
+#                                                                    percentile=98,
+#                                                                    size_closing=10,
+#                                                                    size_gaussblur=11,
+#                                                                    early_stop=None, #None,
+#                                                                    real_baseline=real_baseline,
+#                                                                    method_kwargs_dict=None, #{"D_GradCam": {"num_layer": -3}}
+#                                                                    attr_kwargs_dict=None)
 
-file_name_mask_dac = "mask_dac_df_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".csv"
-file_name_acc = "accuracy_df_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".csv"
-mask_dac_df, accuracy_df = format_mask_dac_df(mask_size_tot, dac_tot, pred_hybrid_tot, mat_count, mat_acc, save_df=True, #WHETHER TO SAVE FILE
-                                              file_name_mask_dac=file_name_mask_dac,
-                                              file_name_acc=file_name_acc,
-                                              file_directory=Path("mask_dac_results"))
-fig_name = "dac_curve_" + baseline_used +  f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
-plot_dac_curve(mask_dac_df, accuracy_df, fig_name=fig_name, fig_directory=fig_directory, compute_dac=True)
+# file_name_mask_dac = "mask_dac_df_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".csv"
+# file_name_acc = "accuracy_df_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".csv"
+# mask_dac_df, accuracy_df = format_mask_dac_df(mask_size_tot, dac_tot, pred_hybrid_tot, mat_count, mat_acc, save_df=True, #WHETHER TO SAVE FILE
+#                                               file_name_mask_dac=file_name_mask_dac,
+#                                               file_name_acc=file_name_acc,
+#                                               file_directory=Path("mask_dac_results"))
+# fig_name = "dac_curve_" + baseline_used +  f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
+# plot_dac_curve(mask_dac_df, accuracy_df, fig_name=fig_name, fig_directory=fig_directory, compute_dac=True)
 
-fig_name = "dac_curve_per_transition_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
-plot_dac_curve_per_transition(mask_dac_df, accuracy_df, fig_name=fig_name, fig_directory=fig_directory, compute_dac=True)
+# fig_name = "dac_curve_per_transition_" + baseline_used + f"_split_{split}_fold_{fold}_mode_{mode}" + suffix + ".png"
+# plot_dac_curve_per_transition(mask_dac_df, accuracy_df, fig_name=fig_name, fig_directory=fig_directory, compute_dac=True, channel=channel)

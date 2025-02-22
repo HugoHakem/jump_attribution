@@ -772,7 +772,9 @@ def plot_fake_img(fake_img_path_preffix, real_img_path, dataset_fold, channel=No
     real_labels = imgs_zarr["labels"].oindex[fold_idx]
     domains = np.unique(real_labels)
     rng = np.random.default_rng(seed)
-    fig, axs = plt.subplots(len(domains) * num_img_per_domain * (len(domains)-1), num_cols, figsize=(40, 70), squeeze=False)
+    fig, axs = plt.subplots(len(domains) * num_img_per_domain * (len(domains)-1), num_cols, figsize=(num_cols * 3,
+                                                                                                     len(domains) * num_img_per_domain * (len(domains)-1) * 3),
+                            squeeze=False)
     N = num_img_per_domain * (len(domains)-1)
     n = (len(domains)-1)
     for i, label in enumerate(domains):
@@ -797,11 +799,12 @@ def plot_fake_img(fake_img_path_preffix, real_img_path, dataset_fold, channel=No
 
     fig.suptitle(f"Real vs Fake img - fold: {fold} - split: {split} - mode: {mode}", y=0.9)
     fig_name = preffix + f"real_fake_img_fold_{fold}_split_{split}_mode_{mode}" + suffix
+    fig.tight_layout()
     fig.savefig(fig_directory / fig_name)
 
 
 starganv2_path = Path("lightning_checkpoint_log") / "StarGANv2_image_crop_active_fold_0_epoch=34-step=204600.ckpt" #"StarGANv2_image_active_fold_0_epoch=29-step=70400.ckpt"
-mode = "lat"#ref or lat
+mode = "ref"#ref or lat
 fold = 0
 split = "test"
 batch_size = 256
@@ -812,12 +815,12 @@ use_ema = True
 #                  batch_size=batch_size, num_outs_per_domain=num_outs_per_domain, use_ema=use_ema)
 
 
-# num_img_per_domain = 2
-# seed = 42
-# real_img_path = "image_active_crop_dataset/imgs_labels_groups.zarr"
-# plot_fake_img(fake_img_path_preffix, real_img_path,  dataset_fold, channel=channel, mode=mode, fold=fold,
-#               split=split, use_ema=use_ema, num_img_per_domain=num_img_per_domain, seed=seed, preffix="image_active_crop_",
-#               fig_directory=fig_directory)
+num_img_per_domain = 5
+seed = 42
+real_img_path = "image_active_crop_dataset/imgs_labels_groups.zarr"
+plot_fake_img(fake_img_path_preffix, real_img_path,  dataset_fold, channel=channel, mode=mode, fold=fold,
+              split=split, use_ema=use_ema, num_img_per_domain=num_img_per_domain, seed=seed, preffix="image_active_crop_",
+              fig_directory=fig_directory)
 
 
 suffix = "_ema" if use_ema else ""
@@ -892,7 +895,7 @@ fake_dataloader = DataLoader(dataset_fake, batch_size=batch_size, num_workers=1,
 # trainer.test(VGG_module, fake_dataloader)
 
 def compute_fid_lpips(fake_img_path_preffix,  dataset_fold, mode="ref",
-                      fold=0, split="train", use_ema=True, batch_size=64, fid_feature=2048):
+                      fold=0, split="train", use_ema=True, channel: list[str]|None=None, batch_size=64, fid_feature=2048):
 
     # set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -928,9 +931,10 @@ def compute_fid_lpips(fake_img_path_preffix,  dataset_fold, mode="ref",
                                                              channel=channel,
                                                              fold_idx=label_real_idx,
                                                              img_transform=v2.Compose([
-                                                                 v2.Lambda(lambda img: torch.tensor(img, dtype=torch.float32)),
+                                                                 v2.Lambda(lambda img: torch.tensor(channel_to_rgb(img, channel, channel_last=False),
+                                                                                                    dtype=torch.float32)),
                                                                  v2.Normalize(mean=len(channel)*[0.5],
-                                                                              std=len(channel)*[0.5])]), #v2.Lambda(lambda img: torch.tensor(img, dtype=torch.float32)),
+                                                                              std=len(channel)*[0.5])]),
                                                              label_transform=lambda label: torch.tensor(label, dtype=torch.long)),
                                  batch_size=batch_size,
                                  num_workers=1, persistent_workers=True)
@@ -951,9 +955,10 @@ def compute_fid_lpips(fake_img_path_preffix,  dataset_fold, mode="ref",
             loader_fake = DataLoader(custom_dataset.ImageDataset_fake(imgs_fake_path,
                                                                       mask_index=fake_idx,
                                                                       img_transform=v2.Compose([
-                                                                          v2.Lambda(lambda img: torch.tensor(img, dtype=torch.float32)),
+                                                                          v2.Lambda(lambda img: torch.tensor(channel_to_rgb(img, channel, channel_last=False),
+                                                                                                             dtype=torch.float32)),
                                                                           v2.Normalize(mean=len(channel)*[0.5],
-                                                                                       std=len(channel)*[0.5])]), #v2.Lambda(lambda img: torch.tensor(img, dtype=torch.float32)),
+                                                                                       std=len(channel)*[0.5])]),
                                                                       label_transform=lambda label: torch.tensor(label, dtype=torch.long)),
                                      batch_size=batch_size,
                                      num_workers=1, persistent_workers=True)
@@ -1064,14 +1069,14 @@ def plot_score(fid_dict, lpips_dict, preffix_name="score", mode="ref",
 ## We can try work on this issue or just turn into RGB
 """
 os.environ["OMP_NUM_THREADS"] = "1"
-extract_emb_layer = slice_sequence_module
-extract_emb_layer_param = {"slice_id": -1}
-trained_model = LightningModelV2.load_from_checkpoint(
-    checkpoint_path=Path("lightning_checkpoint_log") / "VGG_image_crop_active_fold_0_epoch=61-train_acc=0.95-val_acc=0.82.ckpt",
-    model=conv_model.VGG_ch).model
-embedding_model, embedding_to_logits_model = tuple(map(lambda model: model.eval(),
-                                                       extract_emb_layer(trained_model, **extract_emb_layer_param)))
+# extract_emb_layer = slice_sequence_module
+# extract_emb_layer_param = {"slice_id": -1}
+# trained_model = LightningModelV2.load_from_checkpoint(
+#     checkpoint_path=Path("lightning_checkpoint_log") / "VGG_image_crop_active_fold_0_epoch=61-train_acc=0.95-val_acc=0.82.ckpt",
+#     model=conv_model.VGG_ch).model
+# embedding_model, embedding_to_logits_model = tuple(map(lambda model: model.eval(),
+#                                                        extract_emb_layer(trained_model, **extract_emb_layer_param)))
 fid_dict, lpips_dict = compute_fid_lpips(fake_img_path_preffix,  dataset_fold, mode=mode, fold=fold,
-                                         split=split, use_ema=use_ema, batch_size=512, fid_feature=embedding_model)
+                                         split=split, use_ema=use_ema, channel=channel, batch_size=512, fid_feature=2048)
 
 # plot_score(fid_dict, lpips_dict, preffix_name="score", mode=mode, fold=fold, split=split, use_ema=use_ema, cmap="tab10")
