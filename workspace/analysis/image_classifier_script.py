@@ -818,9 +818,9 @@ use_ema = True
 num_img_per_domain = 5
 seed = 42
 real_img_path = "image_active_crop_dataset/imgs_labels_groups.zarr"
-plot_fake_img(fake_img_path_preffix, real_img_path,  dataset_fold, channel=channel, mode=mode, fold=fold,
-              split=split, use_ema=use_ema, num_img_per_domain=num_img_per_domain, seed=seed, preffix="image_active_crop_",
-              fig_directory=fig_directory)
+# plot_fake_img(fake_img_path_preffix, real_img_path,  dataset_fold, channel=channel, mode=mode, fold=fold,
+#               split=split, use_ema=use_ema, num_img_per_domain=num_img_per_domain, seed=seed, preffix="image_active_crop_",
+#               fig_directory=fig_directory)
 
 
 suffix = "_ema" if use_ema else ""
@@ -895,7 +895,7 @@ fake_dataloader = DataLoader(dataset_fake, batch_size=batch_size, num_workers=1,
 # trainer.test(VGG_module, fake_dataloader)
 
 def compute_fid_lpips(fake_img_path_preffix,  dataset_fold, mode="ref",
-                      fold=0, split="train", use_ema=True, channel: list[str]|None=None, batch_size=64, fid_feature=2048):
+                      fold=0, split="train", use_ema=True, channel_str: list[str]|None=None, batch_size=64, fid_feature=2048):
 
     # set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -930,11 +930,10 @@ def compute_fid_lpips(fake_img_path_preffix,  dataset_fold, mode="ref",
         loader_real = DataLoader(custom_dataset.ImageDataset(real_img_path,
                                                              channel=channel,
                                                              fold_idx=label_real_idx,
-                                                             img_transform=v2.Compose([
-                                                                 v2.Lambda(lambda img: torch.tensor(channel_to_rgb(img, channel, channel_last=False),
-                                                                                                    dtype=torch.float32)),
-                                                                 v2.Normalize(mean=len(channel)*[0.5],
-                                                                              std=len(channel)*[0.5])]),
+                                                             img_transform=v2.Lambda(
+                                                                 lambda img: torch.tensor(
+                                                                     channel_to_rgb(img, channel_str, channel_last=False),
+                                                                     dtype=torch.float32)),
                                                              label_transform=lambda label: torch.tensor(label, dtype=torch.long)),
                                  batch_size=batch_size,
                                  num_workers=1, persistent_workers=True)
@@ -954,11 +953,10 @@ def compute_fid_lpips(fake_img_path_preffix,  dataset_fold, mode="ref",
                                                                 (imgs_zarr_fake["labels_org"].oindex[:] == label_org)]
             loader_fake = DataLoader(custom_dataset.ImageDataset_fake(imgs_fake_path,
                                                                       mask_index=fake_idx,
-                                                                      img_transform=v2.Compose([
-                                                                          v2.Lambda(lambda img: torch.tensor(channel_to_rgb(img, channel, channel_last=False),
-                                                                                                             dtype=torch.float32)),
-                                                                          v2.Normalize(mean=len(channel)*[0.5],
-                                                                                       std=len(channel)*[0.5])]),
+                                                                      img_transform=v2.Lambda(
+                                                                          lambda img: torch.tensor(
+                                                                              channel_to_rgb(img, channel_str, channel_last=False),
+                                                                              dtype=torch.float32)),
                                                                       label_transform=lambda label: torch.tensor(label, dtype=torch.long)),
                                      batch_size=batch_size,
                                      num_workers=1, persistent_workers=True)
@@ -974,7 +972,9 @@ def compute_fid_lpips(fake_img_path_preffix,  dataset_fold, mode="ref",
             fid_metric.reset()
 
             # comput lpips score
-            img_transform = v2.Lambda(lambda img: torch.tensor(img, dtype=torch.float32))
+            img_transform = v2.Lambda(lambda img: torch.tensor(
+                channel_to_rgb(img, channel_str, channel_last=False),
+                dtype=torch.float32))
             batch_sampler_fake = BatchSampler(fake_idx, batch_size=batch_size//2, drop_last=False)
             for batch_idx in tqdm(batch_sampler_fake, position=1, desc="lpips", leave=True):
                 # compute similarity between every pair of generated image from a same input but with different ref or lat code.
@@ -1077,6 +1077,6 @@ os.environ["OMP_NUM_THREADS"] = "1"
 # embedding_model, embedding_to_logits_model = tuple(map(lambda model: model.eval(),
 #                                                        extract_emb_layer(trained_model, **extract_emb_layer_param)))
 fid_dict, lpips_dict = compute_fid_lpips(fake_img_path_preffix,  dataset_fold, mode=mode, fold=fold,
-                                         split=split, use_ema=use_ema, channel=channel, batch_size=512, fid_feature=2048)
+                                         split=split, use_ema=use_ema, channel_str=channel, batch_size=512, fid_feature=2048)
 
 # plot_score(fid_dict, lpips_dict, preffix_name="score", mode=mode, fold=fold, split=split, use_ema=use_ema, cmap="tab10")
