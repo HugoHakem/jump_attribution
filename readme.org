@@ -1,45 +1,43 @@
 #+title: Readme
 Repository to keep track of plans, tools, decisions and ways to make things.
 
-#+TITLE: Workspace Structure
+** Workspace architecture
 
-* 📦 workspace/
-    * 📂 analysis/                          # Training and model development
-        * attribution/                        # Attribution
-            - captum_attribution.py             # Feature attribution via Captum
-            - dac_computation.py                # DAC (Decision Attribution Computation)
-            - mask_dataset_creation.py          # Generate masks & create new datasets
-        * classifier/                         # Classifier folder
-            - classifier_architecture.py        # Classifier model definition
-            - classifier_lightning.py           # Lightning version of classifier
-            - classifier_metrics.py             # Validation metrics computation
-            - classifier_training.py            # Training logic for classifier
-        * gan/                                # Generative folder
-            - generative_architecture.py        # GAN/VAE model definition
-            - generative_lightning.py           # Lightning version of generative model
-            - generative_metrics.py             # Validation metrics for generative model
-            - generative_training.py            # Training script for generative model
-        * marimo/                             # Visualization tool
-            - marimo_interface.py               # Interface for MARIMO integration
-        - custom_dataset.py                   # Custom dataset definition
-        - data_splitting.py                   # Train-test split logic
-
-    * 📂 configs/                           # Configuration files (optional)
-    - dataset_config.yaml                     # Configurations for dataset selection
-    - model_config.yaml                       # Hyperparameters & model settings
-
-    * 📂 datasets/                          # Datasets
-    - images/                                 # Zarr folder (real, fake)
-    - metadata/                               # Sample metadata filtered from dataset_retrival
-    - profiles/                               # Raw cell-profiler features
-
-  * 📂 dataset_retrieval/                   # Data selection and preprocessing
-    - balance_dataset.py                      # Script for balancing dataset
-    - image_retrieval.py                      # Script for retrieving images & cropping
-    - plot_utils.py                           # Plotting functions
-    - select_jump_dataset.ipynb               # Notebook for JUMP dataset selection & mAP computation
-
-  * 📂 figures/                             # All figures and plots
-    - attribution_maps/                       # Captum feature attributions
-    - generated_samples/                      # Generated images from generative models
-    - image_filtering/                        # Image filtering for cell detection
+#+BEGIN_EXAMPLE
+workspace/
+├── analysis/                         # Training and model development
+│   ├── attribution/                     # Attribution methods
+│   │   ├── captum_attribution.py           # Feature attribution via Captum
+│   │   ├── dac_computation.py              # Decision Attribution Computation (DAC)
+│   │   ├── mask_dataset_creation.py        # Generate masks & create new datasets
+│   ├── classifier/                      # Classifier models
+│   │   ├── classifier_architecture.py      # Classifier model definition
+│   │   ├── classifier_lightning.py         # Lightning version of classifier
+│   │   ├── classifier_metrics.py           # Validation metrics computation
+│   │   ├── classifier_training.py          # Classifier training logic
+│   ├── gan/                             # Generative models
+│   │   ├── generative_architecture.py      # GAN/VAE model definition
+│   │   ├── generative_lightning.py         # Lightning version of generative model
+│   │   ├── generative_metrics.py           # Generative model metrics
+│   │   ├── generative_training.py          # Generative model training script
+│   ├── marimo/                          # Visualization tool integration
+│   │   ├── marimo_interface.py             # Interface for MARIMO
+│   ├── custom_dataset.py                # Custom dataset definition
+│   ├── data_splitting.py                # Logic for train-test split
+├── configs/                          # Configuration files (optional)
+│   ├── dataset_config.yaml              # Dataset selection configurations
+│   ├── model_config.yaml                # Hyperparameters & model settings
+├── datasets/                         # Datasets
+│   ├── images/                          # Zarr folder (real, fake)
+│   ├── metadata/                        # Sample metadata from dataset_retrieval
+│   ├── profiles/                        # Raw cell-profiler features
+├── dataset_retrieval/                # Data selection and preprocessing
+│   ├── balance_dataset.py               # Balancing dataset script
+│   ├── image_retrieval.py               # Image retrieval & cropping script
+│   ├── plot_utils.py                    # Plotting utilities
+│   ├── select_jump_dataset.ipynb     # Notebook for JUMP dataset selection & mAP computation
+├── figures/                             # Figures and plots
+│   ├── attribution_maps/                # Captum feature attributions
+│   ├── generated_samples/               # Generated samples from models
+│   ├── image_filtering/                 # Image filtering for cell detection
+#+END_EXAMPLE
