@@ -75,9 +75,9 @@
                         export PYTHON_KEYRING_BACKEND=keyring.backends.fail.Keyring
                         runHook venvShellHook
                         uv pip sync requirements.txt
-                        export PYTHONPATH=${python_with_pkgs}/${python_with_pkgs.sitePackages}:$PYTHONPATH
+                        export PYTHONPATH="$PWD/workspace/analysis:${python_with_pkgs}/${python_with_pkgs.sitePackages}:$PYTHONPATH"
                     '';
-                  };
+                  };   # export PYTHONPATH=${python_with_pkgs}/${python_with_pkgs.sitePackages}:$PYTHONPATH
               };
         }
       );
