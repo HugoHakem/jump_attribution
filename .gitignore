@@ -26,6 +26,9 @@ trained_model/
 ## deprecated
 workspace/src/deprecated/
 
+## csv file
+*.csv
+
 # bytecode files
 __pycache__/
 *.pyc
