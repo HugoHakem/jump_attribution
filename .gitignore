@@ -1,0 +1,39 @@
+# Environment files
+.direnv/
+.venv/
+
+# VSCode settings
+.vscode/
+
+# Temporary files
+*.log
+pid.txt
+
+# Python
+## datasets & figures
+workspace/datasets/images/
+workspace/datasets/metadata/
+workspace/datasets/profiles/
+workspace/figures/
+
+## lightning log and checkpointsx
+*log*/
+*checkpoint*/
+
+## trained models
+trained_model/
+
+## deprecated
+workspace/src/deprecated/
+
+# bytecode files
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+
+
+
