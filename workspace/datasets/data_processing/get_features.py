@@ -24,16 +24,23 @@ filepaths = {
 
 
 def lazy_load(path: str) -> pl.LazyFrame:
+    """
+    Lazily loads a dataset from an S3 path using PyArrow and Polars.
+
+    This function loads a dataset stored in an S3 bucket and applies preprocessing 
+    to standardize source metadata. Specifically, it:
+      - Filters out data from "source_9" and "source_1" due to incompatibility
+
+    Args:
+        path (str): The S3 path to the dataset in Parquet format.
+
+    Returns:
+        pl.LazyFrame: A lazily loaded Polars DataFrame with preprocessed metadata.
+    """
     fs = S3FileSystem(anon=True)
     myds = dataset(path, filesystem=fs)
     df = pl.scan_pyarrow_dataset(myds)
-    #source 13 and 7 are the same. 
     #source 9 and 1 are not comparable to the others due to different plate type with more wells
-    df = df.with_columns(
-        pl.when(pl.col("Metadata_Source").str.contains("_13$"))
-        .then(pl.lit("source_7"))
-        .otherwise(pl.col("Metadata_Source"))
-        .alias("Metadata_Source"))
     df = df.filter(pl.col("Metadata_Source").str.contains("_9|_1$") != True)
     return df
 
@@ -42,8 +49,8 @@ def load_features(table_name: str,
     """
     Return the profiles or feature table of the "metadata" dataframe passed
     retirved from the feature table named after "table_name"
-    ----------
-    Parameters: 
+
+    Args: 
         table_name(str): The wished table from which the features should be retrieved.
           -> must be in {"CRISPR",
                          "ORF",
@@ -55,8 +62,7 @@ def load_features(table_name: str,
                                       Metadata_Well,
                                       Metadata_JCP2022
                                       ]
-    ----------
-    Return:
+    Returns:
         pl.DataFrame
     """
     
