@@ -5,7 +5,13 @@ import cupy as cp
 import numpy as np
 import pandas as pd
 import polars as pl
+from concurrent.futures import ProcessPoolExecutor
+from itertools import groupby, starmap
+from scipy.stats import median_abs_deviation
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing._data import _handle_zeros_in_scale
+from os import cpu_count
+
 
 DataFrame: TypeAlias = pd.DataFrame | pl.DataFrame
 ndarray: TypeAlias = cp.ndarray | np.ndarray
@@ -37,7 +43,7 @@ class FeaturesDropCorr(TransformerMixin, BaseEstimator):
         features: DataFrame | ndarray, 
         y: None = None, 
         **params
-    ) -> None:
+    ) -> "FeaturesDropCorr":
         """
         Identifies features to drop based on correlation and standard deviation.
 
@@ -125,6 +131,7 @@ class FeaturesDropCorr(TransformerMixin, BaseEstimator):
         more_drop = set(map(lambda x: x[2], m))
         #Finally merge with columns to drop while removing std=0
         self.columns_to_drop = list(std_drop | drop | more_drop)
+        return self
         
     def transform(
         self, 
@@ -162,4 +169,212 @@ class FeaturesDropCorr(TransformerMixin, BaseEstimator):
         """
         self.fit(features, y, **params)
         return self.transform(features, y, **params)
+
+
+class MadScaler(BaseEstimator, TransformerMixin):
+    """
+    Scales data using the Median Absolute Deviation (MAD), making it robust to outliers.
+    """
+    
+    def __init__(
+        self, 
+        **kwargs
+    ) -> None:
+        pass
+    
+    def fit(
+        self, 
+        X: np.ndarray, 
+        y: None = None
+    ) -> "MadScaler":
+        """
+        Compute the median and MAD of the training data.
+        
+        Args:
+            X (np.ndarray): Input data of shape (n_samples, n_features).
+            y (None, optional): Ignored.
+        
+        Returns:
+            MadScaler: Fitted scaler instance.
+        """
+        self.median = np.median(X, axis=0)
+        self.scale = median_abs_deviation(X, axis=0, scale=1.0)
+        self.scale = _handle_zeros_in_scale(self.scale, copy=False)
+        return self
+    
+    def transform(
+        self, 
+        X: np.ndarray
+    ) -> np.ndarray:
+        """
+        Scale the data using the previously computed median and MAD.
+        
+        Args:
+            X (np.ndarray): Input data of shape (n_samples, n_features).
+        
+        Returns:
+            np.ndarray: Scaled data.
+        """
+        return (X - self.median) / self.scale
+    
+    def fit_transform(
+        self, 
+        X: np.ndarray, 
+        y: None = None
+    ) -> np.ndarray:
+        """
+        Fit the scaler and transform the data in one step.
+        """
+        return self.fit(X).transform(X)
+
+def _group_fitter(
+    scaler_group_X
+) -> dict:
+    """ 
+    Helper function.
+    Apply fitter function to a group.
+    """
+    
+    scaler, group, X = scaler_group_X
+    return {group: scaler.fit(X)}
+
+def _group_transformer(
+    scaler_index_X
+) -> dict:
+    """ 
+    Helper function.
+    Apply fitter function to a group.
+    """
+    
+    scaler, index, X = scaler_index_X
+    return [index, scaler.transform(X)]
+    
+
+class GroupScaling():
+    """
+    Scales data using a specified scaler for each group in the dataset.
+    """
+    def __init__(self, scaler, **scaler_kwargs) -> None:
+        """
+        Initialize with a scaler class and its arguments.
+
+        Args:
+            scaler (class): Scaler class (e.g., StandardScaler).
+            **scaler_kwargs: Additional arguments for the scaler.
+        """
+        self._scaler = scaler
+        self._scaler_kwargs = scaler_kwargs
+
+    def fit(
+        self, 
+        X: np.ndarray, 
+        groups: np.ndarray
+    ) -> "GroupScaling":
+        """
+        Fit a scaler for each group in the data.
+
+        Args:
+            X (np.ndarray): Data to scale.
+            groups (np.ndarray): Group labels for each data point.
+
+        Returns:
+            GroupScaling: Fitted instance.
+        """
+        data = groupby(
+            sorted(zip(X, groups), key=lambda tup: tup[1]), 
+            key=lambda tup: tup[1]
+        )
+        unique_keys = np.unique(groups).size
+        scaler_groups = zip(
+            [self._scaler(**self._scaler_kwargs) for _ in range(unique_keys)], 
+            data
+        )
+        iterator = list(
+            starmap(
+                lambda scaler, groups: (scaler, groups[0], np.stack(list(zip(*groups[1]))[0])), 
+                scaler_groups))
+        
+        with ProcessPoolExecutor(min(cpu_count(), 50)) as ex:
+            _list_scalers = list(ex.map(_group_fitter, iterator))
+        self.scalers = {k: v for d in _list_scalers for k,v in d.items()}
+        return self
+        
+    def transform(
+        self, 
+        X: np.ndarray, 
+        groups: np.ndarray
+    ) -> np.ndarray:
+        """
+        Transform data using the fitted scalers for each group.
+
+        Args:
+            X (np.ndarray): Data to transform.
+            groups (np.ndarray): Group labels for each data point.
+
+        Returns:
+            np.ndarray: Scaled data.
+
+        Raises:
+            AssertionError: If groups are not a subset of fitted groups.
+        """
+        if not set(groups).issubset(self.scalers.keys()):
+            raise AssertionError(
+                "GroupScaling can only occur if the groups of transformed data are a subset of fitted groups."
+            )
+            
+        data = groupby(
+            sorted(zip(X, groups, np.arange(len(groups))), 
+                   key=lambda tup: tup[1]), 
+            key=lambda tup: tup[1]
+        )
+        iterator = list(
+            starmap(
+                lambda _k, _groups : (
+                    self.scalers[_k], 
+                    *list(
+                        starmap(lambda _X, _gr, _index: (np.stack(_index), np.stack(_X)), 
+                                [list(zip(*_groups))])
+                    )[0]), 
+                data)
+        )        
+        with ProcessPoolExecutor(min(cpu_count(), 50)) as ex:
+            _list_index_X = list(ex.map(_group_transformer, iterator))
+        scaled_X = np.zeros_like(X)
+        for _index, _X in _list_index_X:
+            scaled_X[_index, :] = _X
+        
+        # for k, g in groupby(data, key=lambda tup: tup[1]):
+        #     _X, _, _index = list(zip(*g))
+        #     _X, _index = np.stack(_X), np.stack(_index)
+        #     scaled_X[_index, :] = self.scalers[k].transform(_X)
+        return scaled_X
+
+    def fit_transform(
+        self, 
+        X: np.ndarray, 
+        groups: np.ndarray
+    ) -> np.ndarray: 
+        """
+        Fits and transforms the dataframe or matrix.
+        """
+        self.fit(X, groups)
+        return self.transform(X, groups)
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

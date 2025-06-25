@@ -24,5 +24,13 @@ def same_plate_trt_control(metadata: pl.DataFrame) -> pl.DataFrame:
             .unique(),
             on="Metadata_Plate",
             how="inner"
+        ).join(
+            metadata
+            .filter(pl.col("pert_iname") == "DMSO")
+            .select("Metadata_Plate")
+            .unique(),
+            on="Metadata_Plate",
+            how="inner"
         )
     )
+
