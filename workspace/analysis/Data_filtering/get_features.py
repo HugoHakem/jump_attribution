@@ -2,24 +2,10 @@ import polars as pl
 from pyarrow.dataset import dataset
 from s3fs import S3FileSystem
 
-
-_PREFIX = (
-    "s3://cellpainting-gallery/cpg0016-jump-assembled/source_all/workspace/profiles"
-)
-_RECIPE = "jump-profiling-recipe_2024_a917fa7"
-
-transforms = (
-    (
-        "CRISPR",
-        "profiles_wellpos_cc_var_mad_outlier_featselect_sphering_harmony_PCA_corrected",
-    ),
-    ("ORF", "profiles_wellpos_cc_var_mad_outlier_featselect_sphering_harmony"),
-    ("COMPOUND", "profiles_var_mad_int_featselect_harmony"),
-)
-
 filepaths = {
-    dset: f"{_PREFIX}/{_RECIPE}/{dset}/{transform}/profiles.parquet"
-    for dset, transform in transforms
+    "CRISPR": "s3://cellpainting-gallery/cpg0016-jump-assembled/source_all/workspace/profiles_assembled/CRISPR/v1.0a/profiles.parquet",
+    "ORF": "s3://cellpainting-gallery/cpg0016-jump-assembled/source_all/workspace/profiles_assembled/ORF/v1.0a/profiles.parquet",
+    "COMPOUND": "s3://cellpainting-gallery/cpg0016-jump-assembled/source_all/workspace/profiles_assembled/COMPOUND/v1.0/profiles.parquet",
 }
 
 
